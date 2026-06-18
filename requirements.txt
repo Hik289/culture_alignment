@@ -1,0 +1,32 @@
+# CultureLens-RC dependencies (direct, Python 3.11+)
+# Tested versions in parentheses are what we ran on; later versions likely OK.
+
+# Core scientific stack
+numpy>=1.26,<2.0
+pandas>=2.0
+pyarrow>=15.0
+scipy>=1.10
+
+# LLM client (Azure-compatible OpenAI v1 SDK)
+openai>=1.50
+# Optional: bearer-token auth via DefaultAzureCredential (api_key direct also supported)
+azure-identity>=1.20
+azure-core>=1.30
+
+# Retrieval
+sentence-transformers>=2.7
+faiss-cpu>=1.7
+
+# Data
+datasets>=2.20
+huggingface_hub>=0.20
+
+# Testing
+pytest>=7.0
+
+# Plotting (for figures only; experiments don't need)
+matplotlib>=3.8
+seaborn>=0.13
+
+# Progress bars
+tqdm>=4.60
