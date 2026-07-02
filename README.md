@@ -39,18 +39,9 @@ General semantic retrieval can surface evidence from the wrong country or region
 
 ## Overview
 
-```text
-Question + Country + Topic
-        |
-        v
-+------------------------------------------------------------+
-| 1. Hierarchical Filter     country/topic evidence filtering |
-| 2. Top-k Retrieval         FAISS dense, MiniLM-L6 384d      |
-| 3. Prototype Card          per-country aggregate summary    |
-| 4. LLM Prompt + Answer     Azure gpt-* deployment           |
-| 5. Temperature Calibration T-scaling per bench/prompt/K     |
-+------------------------------------------------------------+
-```
+<p align="center">
+  <img src="figures/culturelens_rc_overview.png" width="900" alt="CultureLens-RC overview pipeline">
+</p>
 
 ## Environment Setup
 
@@ -130,7 +121,8 @@ Never commit `.env` or local credential files.
 |-- .env.example
 |-- requirements.txt
 |-- figures/
-|   `-- fig_intuition_cross_country_pollution.png
+|   |-- fig_intuition_cross_country_pollution.png
+|   `-- culturelens_rc_overview.png
 |-- src/                            # Core library
 |   |-- azure_client.py             # OpenAI-compatible Azure client
 |   |-- metrics.py                  # W1, JS-D, KL, TV, Acc, F1, EM, NLL, Brier, ECE
