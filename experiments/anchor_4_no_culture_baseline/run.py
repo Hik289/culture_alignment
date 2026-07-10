@@ -37,7 +37,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from src.azure_client import chat_json, MODEL_NAME  # noqa: E402
+from src.model_client import chat_json, MODEL_NAME  # noqa: E402
 from src.io import BENCH_PATHS, load_bench  # noqa: E402
 from src.metrics import (  # noqa: E402
     accuracy,

@@ -176,14 +176,14 @@ class RuleBasedProtoBuilder(ProtoBuilder):
 
 
 # ---------------------------------------------------------------------------
-# LLM Summarizer 占位 (EXP_DESIGN 后接 src.azure_client.chat_json)
+# LLM Summarizer 占位 (EXP_DESIGN 后接 src.model_client.chat_json)
 # ---------------------------------------------------------------------------
 
 class LLMSummarizerProtoBuilder(ProtoBuilder):
     """用 LLM 对一组 evidence 写 1-2 句原型.
 
     当前是占位 (raise NotImplementedError on real call), 接口稳定后 EXP_DESIGN 后实现:
-        - 调 src.azure_client.chat_json(...) with json_object response_format
+        - 调 src.model_client.chat_json(...) with json_object response_format
         - prompt 强制要求 warning 字段非空
         - 失败 → fallback 到 RuleBasedProtoBuilder.build_one
     """

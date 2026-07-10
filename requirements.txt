@@ -7,11 +7,8 @@ pandas>=2.0
 pyarrow>=15.0
 scipy>=1.10
 
-# LLM client (Azure-compatible OpenAI v1 SDK)
+# Model API client
 openai>=1.50
-# Optional: bearer-token auth via DefaultAzureCredential (api_key direct also supported)
-azure-identity>=1.20
-azure-core>=1.30
 
 # Retrieval
 sentence-transformers>=2.7

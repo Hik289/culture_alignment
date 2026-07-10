@@ -1,9 +1,9 @@
-"""离线测试 azure_client 的不依赖网络部分:
+"""离线测试 model_client 的不依赖网络部分:
 - _try_parse_json: 直接 / fence / 平衡子串 fallback
 - _classify_exc: 异常分类
 - _is_retriable: 是否重试
 
-不调用 Azure, 不依赖凭据.
+不调用外部服务, 不依赖凭据.
 """
 
 from __future__ import annotations
@@ -16,7 +16,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.azure_client import (  # noqa: E402
+from src.model_client import (  # noqa: E402
     ERR_AUTH,
     ERR_BAD_REQUEST,
     ERR_CONNECTION,
@@ -98,7 +98,7 @@ class TestJSONFallback:
 
 class TestClassifyExc:
     def test_generic_exception_other(self):
-        """非 openai 异常归为 other."""
+        """非 SDK 异常归为 other."""
         et, ra = _classify_exc(ValueError("nope"))
         assert et == ERR_OTHER
         assert ra is None

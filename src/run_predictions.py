@@ -9,7 +9,7 @@
 
 EXP_DESIGN 后接入:
 - method handlers (no_culture / country / demographic / prototype / general_semantic / culturelens_rc)
-- 实际 LLM 调用 (src.azure_client + src.prompts)
+- 实际 LLM 调用 (src.model_client + src.prompts)
 - 实际 metric 计算 (src.metrics)
 - 实际 split 加载 (src.io.load_split)
 """
@@ -52,7 +52,7 @@ class RunConfig:
     use_prototype: bool = True     # prototype on/off (prototype ablation)
     top_k: int = 8                 # 检索 top-k
     out_dir: str = "experiments/runs"
-    model: str = "gpt-5.4-mini"
+    model: str = os.environ.get("LLM_MODEL", "your-model-name")
     # 三模块 on/off 速记 (写入文件名)
     @property
     def config_id(self) -> str:
@@ -208,7 +208,7 @@ def parse_args(argv: list[str] | None = None) -> RunConfig:
     p.add_argument("--no-prototype", action="store_true")
     p.add_argument("--top-k", type=int, default=8)
     p.add_argument("--out-dir", default="experiments/runs")
-    p.add_argument("--model", default="gpt-5.4-mini")
+    p.add_argument("--model", default=os.environ.get("LLM_MODEL", "your-model-name"))
     a = p.parse_args(argv)
     return RunConfig(
         method=a.method,
@@ -308,7 +308,7 @@ def dispatch_items_with_rate_limit(
 ) -> list[dict]:
     """带 rate limit 的并发 dispatch.
 
-    Azure rate limit 可能是 RPM / TPM, 这里只做简单 RPS 限制.
+    Model API rate limit 可能是 RPM / TPM, 这里只做简单 RPS 限制.
     max_per_second > 0 时, 每提交一个任务前 sleep 间隔.
     """
     import time

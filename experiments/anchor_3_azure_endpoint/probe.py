@@ -31,7 +31,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from src.azure_client import MODEL_NAME, chat_json  # noqa: E402
+from src.model_client import MODEL_NAME, chat_json  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,

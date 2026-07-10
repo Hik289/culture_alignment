@@ -25,7 +25,7 @@ from scripts.step_3_main import (  # noqa: E402
     _safe_extract_probs, apply_prompt_variant, get_prototype_card, get_T_star,
     retrieve_general, retrieve_hierarchical,
 )
-from src.azure_client import chat_json  # noqa: E402
+from src.model_client import chat_json  # noqa: E402
 from src.calibrate import apply_temperature  # noqa: E402
 from src.metrics import js_distance, top1_accuracy, tv_distance, wasserstein_1  # noqa: E402
 from src.prompts import render_baseline, to_chat_messages  # noqa: E402

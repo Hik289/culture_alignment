@@ -1,8 +1,8 @@
-"""Azure AI Foundry gpt-5.4-mini 客户端封装.
+"""General model API JSON client for CultureLens-RC experiments.
 
 设计:
-- 用 azure.identity.DefaultAzureCredential() + get_bearer_token_provider() 拿 token, 不硬编码 API key.
-- 用 openai.OpenAI(base_url=..., api_key=token_provider()) 兼容 OpenAI v1 SDK.
+- 默认读取 LLM_API_KEY / LLM_BASE_URL / LLM_MODEL, 不硬编码 API key.
+- 用 chat-completions-compatible SDK 作为通用传输层.
 - 高层接口 chat_json(): temperature=0 + JSON 模式 + 自动重试 + 错误分类.
 - 记录 tokens / latency / 调用元数据 / error_type.
 
@@ -12,10 +12,9 @@
 - 5xx / network → 指数退避重试
 - JSON 解析失败 → 尝试 markdown fence 剥离 + 抓首个 {...} 子串作为 fallback, 仍失败再重试
 
-约束 (idea.md):
-1. 一律 gpt-5.4-mini via Azure
-2. DefaultAzureCredential + bearer token, 禁止硬编码 key
-3. 仅供本仓库实验使用
+约束:
+1. 模型、endpoint、key 都从环境变量或函数参数配置.
+2. 仅供本仓库实验使用.
 """
 
 from __future__ import annotations
@@ -31,15 +30,23 @@ from typing import Any, Callable, Optional
 
 logger = logging.getLogger(__name__)
 
-# 环境变量: 若 AZURE_API_KEY 已设置 → 用 api_key 直连 (researcher 临时授权)
-# 否则回退 DefaultAzureCredential (idea.md §"API 使用约束"第 4 条原始要求)
-ENV_API_KEY = "AZURE_API_KEY"
-
-# Azure endpoint (来源: idea.md)
-AZURE_ENDPOINT_BASE = "${AZURE_OPENAI_ENDPOINT}"
-# Azure Cognitive Services scope (token audience)
-COGNITIVE_SCOPE = "https://cognitiveservices.azure.com/.default"
-MODEL_NAME = "gpt-5.4-mini"
+ENV_API_KEY = "LLM_API_KEY"
+EXTRA_ENV_API_KEYS = ("MODEL_API_KEY",)
+MODEL_API_BASE_URL = (
+    os.environ.get("LLM_BASE_URL")
+    or os.environ.get("MODEL_API_BASE_URL")
+    or "${LLM_BASE_URL}"
+)
+MODEL_NAME = (
+    os.environ.get("LLM_MODEL")
+    or os.environ.get("MODEL_NAME")
+    or "your-model-name"
+)
+NO_TEMPERATURE_PREFIXES = tuple(
+    p.strip()
+    for p in os.environ.get("LLM_NO_TEMPERATURE_PREFIXES", "").split(",")
+    if p.strip()
+)
 
 # error_type 标签 (写进 CallResult 用于聚合分析)
 ERR_AUTH = "auth"               # 401, 凭据失败, token 过期
@@ -79,25 +86,32 @@ def _get_token_provider() -> Callable[[], str]:
     """认证 provider 工厂.
 
     优先级:
-    1. 环境变量 AZURE_API_KEY 已设 → 返回固定 api_key 的 callable (researcher 临时授权)
-    2. 否则用 DefaultAzureCredential + bearer token (idea.md 第 4 条原始要求)
+    1. 通用环境变量 LLM_API_KEY.
+    2. 通用备用环境变量 MODEL_API_KEY.
     """
     api_key = os.environ.get(ENV_API_KEY)
     if api_key:
-        logger.info("auth: using AZURE_API_KEY env var (researcher-authorized fallback)")
-        # 包装成 callable 与 token_provider 接口对齐
+        logger.info("auth: using LLM_API_KEY env var")
         return lambda: api_key  # noqa: E731
 
-    logger.info("auth: using DefaultAzureCredential + bearer token")
-    from azure.identity import DefaultAzureCredential, get_bearer_token_provider
-    credential = DefaultAzureCredential()
-    return get_bearer_token_provider(credential, COGNITIVE_SCOPE)
+    for env_name in EXTRA_ENV_API_KEYS:
+        api_key = os.environ.get(env_name)
+        if api_key:
+            logger.info("auth: using MODEL_API_KEY env var")
+            return lambda: api_key  # noqa: E731
+
+    raise RuntimeError("Set LLM_API_KEY before running model API experiments.")
 
 
 def _build_client(token_provider: Callable[[], str]):
-    from openai import OpenAI
-    return OpenAI(
-        base_url=AZURE_ENDPOINT_BASE,
+    from openai import OpenAI as ChatCompletionsClient
+    base_url = (
+        os.environ.get("LLM_BASE_URL")
+        or os.environ.get("MODEL_API_BASE_URL")
+        or MODEL_API_BASE_URL
+    )
+    return ChatCompletionsClient(
+        base_url=base_url,
         api_key=token_provider(),  # 当前 token / api_key, 后续每次调用前刷新
     )
 
@@ -172,8 +186,8 @@ def _try_parse_json(content: str) -> tuple[Optional[Any], bool, Optional[str]]:
 # ---------------------------------------------------------------------------
 
 def _classify_exc(e: Exception) -> tuple[str, Optional[float]]:
-    """根据 openai SDK 抛出的异常分类. 返回 (error_type, retry_after_seconds_hint)."""
-    # 惰性导入避免没装 openai 时炸
+    """根据 chat-completions SDK 抛出的异常分类. 返回 (error_type, retry_after_seconds_hint)."""
+    # 惰性导入避免没装 model client SDK 时炸
     try:
         from openai import (
             APIConnectionError,
@@ -233,13 +247,13 @@ def chat_json(
     max_backoff: float = 30.0,
     timeout: Optional[float] = 60.0,
 ) -> CallResult:
-    """同步调用 Azure gpt-5.4-mini, 强制 JSON 输出.
+    """同步调用配置的模型 API, 强制 JSON 输出.
 
     Args:
-        messages: OpenAI chat messages.
+        messages: chat messages.
         model: 模型名.
         max_retries: 额外重试次数 (总尝试 = max_retries + 1).
-        temperature: 默认 0; 对 gpt-5 / o-series 不传.
+        temperature: 默认 0; 对部分 reasoning model 不传.
         response_format: 默认 {"type": "json_object"}.
         extra_kwargs: 额外参数 (如 max_completion_tokens / seed).
         base_backoff / max_backoff: 指数退避基/上限 (秒).
@@ -273,8 +287,9 @@ def chat_json(
                 "response_format": response_format,
                 **extra_kwargs,
             }
-            # gpt-5 系列 / o-series reasoning model 不接受 temperature 不为默认值
-            if temperature is not None and not model.startswith(("gpt-5", "o1", "o3")):
+            # 部分 reasoning model 不接受 temperature 不为默认值; 需要时用
+            # LLM_NO_TEMPERATURE_PREFIXES 配置这些模型名前缀.
+            if temperature is not None and not model.startswith(NO_TEMPERATURE_PREFIXES):
                 kwargs["temperature"] = temperature
             if timeout is not None:
                 kwargs["timeout"] = timeout
@@ -393,7 +408,7 @@ def chat_json(
 
 
 __all__ = [
-    "AZURE_ENDPOINT_BASE",
+    "MODEL_API_BASE_URL",
     "MODEL_NAME",
     "CallResult",
     "chat_json",

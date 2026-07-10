@@ -211,7 +211,7 @@ rm experiments/step_3_main/runs/{cell_id}.json
 ## 9. Known limitations / caveats
 
 - **gpt-5.4-mini pricing**: Used `gpt-4o-mini` rate ($0.15 in / $0.60 out per 1M tokens) as placeholder. Real prices may differ; update `PRICE_INPUT_PER_M / PRICE_OUTPUT_PER_M` constants in `experiments/anchor_3_azure_endpoint/probe.py` and re-run `scripts/step_5_aggregate.py` for accurate cost.
-- **Temperature not passed**: gpt-5 reasoning model rejects non-default temperature via OpenAI SDK. `src/azure_client.py` detects model name prefix and skips. Actual sampling temperature controlled by model defaults.
+- **Temperature not passed**: gpt-5 reasoning model rejects non-default temperature via OpenAI SDK. `src/model_client.py` detects model name prefix and skips. Actual sampling temperature controlled by model defaults.
 - **WVB W1 high variance**: σ ≈ 0.66 in main table, attributed to ordinal scale mismatch (integer support 1..K vs literature's [0,1] normalization). H0.anchor_4_diag opened by Researcher for future investigation.
 - **BLEnD MC tier high-resource**: data_scientist's tier groupings sparse on the high-resource side for BLEnD MC; tier-stratified table reports only low-resource for that bench (high-resource n=0 cells in tier breakdown).
 
