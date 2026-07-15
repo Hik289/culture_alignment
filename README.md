@@ -1,8 +1,8 @@
 # CultureLens-RC
 
 <p align="center">
-  <img src="https://img.shields.io/badge/python-3.11%2B-blue" alt="Python 3.11+">
-  <img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="MIT license"></a>
+  <a href="requirements.txt"><img src="https://img.shields.io/badge/Python-3.11%2B-3776AB.svg" alt="Python 3.11+"></a>
 </p>
 
 **Retrieval-Calibrated Cultural Alignment across Global Opinions, Social Norms, and Everyday Knowledge**
