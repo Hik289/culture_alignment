@@ -11,7 +11,13 @@ CultureLens-RC is an **inference-only** framework that aligns large language mod
 
 We evaluate on four heterogeneous benchmarks: WorldValuesBench, GlobalOpinionQA, NormAd-Eti, and BLEnD, covering survey distributions, social-norm judgments, and everyday cultural knowledge.
 
-## Intuition
+## At a Glance
+
+- **Research question.** How can retrieval calibrate cultural alignment across opinions, norms, and everyday knowledge?
+- **Core idea.** CultureLens-RC combines retrieval evidence with calibrated decision rules across heterogeneous cultural benchmarks.
+- **What is included.** Environment setup, benchmark evaluation scripts, directory structure, testing, and paper-result reproduction commands.
+
+## Motivation
 
 <p align="center">
   <img src="figures/fig_intuition_cross_country_pollution.png" width="720" alt="Cross-country pollution problem in general semantic retrieval">
@@ -19,7 +25,7 @@ We evaluate on four heterogeneous benchmarks: WorldValuesBench, GlobalOpinionQA,
 
 General semantic retrieval can surface evidence from the wrong country or region when questions are semantically similar. CultureLens-RC reduces this cross-country pollution by filtering retrieval through the target country, topic, and task before prompting the model.
 
-## Highlights
+## Key Contributions
 
 - Hierarchical evidence filtering for country-aware and topic-aware retrieval.
 - Per-country prototype cards built only from training-split evidence.
@@ -101,7 +107,7 @@ Never commit `.env` or local credential files.
    python scripts/step_6_paper_tables.py
    ```
 
-## Directory Structure
+## Repository Structure
 
 ```text
 .
