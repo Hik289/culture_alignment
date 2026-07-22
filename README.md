@@ -11,11 +11,11 @@ CultureLens-RC is an **inference-only** framework that aligns large language mod
 
 We evaluate on four heterogeneous benchmarks: WorldValuesBench, GlobalOpinionQA, NormAd-Eti, and BLEnD, covering survey distributions, social-norm judgments, and everyday cultural knowledge.
 
-## At a Glance
+## Repository Summary
 
-- **Research question.** How can retrieval calibrate cultural alignment across opinions, norms, and everyday knowledge?
-- **Core idea.** CultureLens-RC combines retrieval evidence with calibrated decision rules across heterogeneous cultural benchmarks.
-- **What is included.** Environment setup, benchmark evaluation scripts, directory structure, testing, and paper-result reproduction commands.
+- **Scope.** How can retrieval calibrate cultural alignment across opinions, norms, and everyday knowledge?
+- **Method.** CultureLens-RC combines retrieval evidence with calibrated decision rules across heterogeneous cultural benchmarks.
+- **Contents.** Environment setup, benchmark evaluation scripts, directory structure, testing, and paper-result reproduction commands.
 
 ## Motivation
 
@@ -151,16 +151,16 @@ pytest tests/
 
 The tests cover metrics, prompts, retrieval, prototypes, calibration, and aggregation.
 
-## Reviewer Guide
+## Artifact Notes
 
-For a reviewer-oriented map of smoke checks, paper-scale entry points, data boundaries, and reporting metadata, see [Artifact Guide](docs/ARTIFACT.md).
+Reproduction notes are in [docs/ARTIFACT.md](docs/ARTIFACT.md): environment files, smoke checks, data boundaries, and paper-scale entry points.
 
-## Artifact Checklist
+## Reproducibility Notes
 
-- **Code release.** Core implementations, configuration files, and reproduction entry points are versioned in this repository.
-- **Reproducibility.** Start with the smoke or quick-start path before paper-scale runs; record the commit hash, Python version, backend/model identifiers, seeds, and command-line arguments.
-- **Data and credentials.** Large datasets, benchmark downloads, generated outputs, and API keys are intentionally excluded. Use the data and configuration notes above to recreate them or point to local copies.
-- **Reporting.** For paper-scale runs, keep raw run folders immutable and regenerate tables or figures from the logged artifacts with the listed analysis scripts.
+- **Release.** Source code, configuration files, and runnable entry points are tracked here.
+- **Runs.** Start with the smoke or quick-start commands before full grids; record commit hash, Python version, model/backend identifiers, seeds, and command-line arguments.
+- **Data.** Large datasets, benchmark downloads, generated outputs, and API keys are not tracked. Use the data/configuration notes above to recreate or point to local copies.
+- **Reporting.** Keep raw run folders fixed for paper-scale runs and regenerate tables or figures from logged artifacts with the listed scripts.
 
 ## Citation
 
