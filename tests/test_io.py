@@ -1,11 +1,8 @@
-"""src/io.py 离线测试.
-
-不依赖 Azure; 但**依赖 hpc 上的 data/processed/*.parquet**.
-所以只在 hpc 上跑会全部通过; GCP 上 data_scientist 还没物化时部分会 skip.
-"""
+"""Offline tests for the materialized benchmark loaders."""
 
 from __future__ import annotations
 
+import os
 import sys
 from pathlib import Path
 
@@ -14,7 +11,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.io import (  # noqa: E402
+from src.io import (
     BENCH_PATHS,
     BenchHandle,
     list_benchmarks,
@@ -23,10 +20,10 @@ from src.io import (  # noqa: E402
 
 
 def _root():
-    """优先选 hpc 路径 (跑测试在 hpc 上); 否则用本仓库根."""
-    hpc = Path("${EXPERIMENT_ROOT}")
-    if hpc.exists():
-        return hpc
+    """Use the configured experiment root when available."""
+    experiment_root = os.environ.get("EXPERIMENT_ROOT")
+    if experiment_root:
+        return Path(experiment_root)
     return ROOT
 
 
@@ -37,11 +34,11 @@ class TestListBenchmarks:
         assert names == set(BENCH_PATHS.keys())
 
     def test_at_least_one_exists(self):
-        """data_scientist 已物化, 至少有一个."""
+        """Inspect materialized datasets when they are available."""
         handles = list_benchmarks(root_dir=_root())
         existing = [h for h in handles if h.exists]
         if not existing:
-            pytest.skip("data_scientist 物化未完成, 跳过")
+            pytest.skip("no materialized datasets are available")
         assert all(isinstance(h, BenchHandle) for h in existing)
         assert all(h.rows is None or h.rows > 0 for h in existing)
 
@@ -72,7 +69,7 @@ class TestLoadBench:
 
 
 class TestBenchSchemas:
-    """data_scientist schema 约束 — 改 schema 必更新这里, 防止下游静默 break."""
+    """Guard the schemas consumed by downstream evaluation code."""
 
     def test_wvb_distributions_schema(self):
         name = "wvb.probe_distributions"

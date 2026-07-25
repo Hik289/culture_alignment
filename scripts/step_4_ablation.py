@@ -20,16 +20,28 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from scripts.step_3_main import (  # noqa: E402
-    BENCH_LOADERS, BENCH_N_SAMPLES, _compute_metrics, _fmt_evidence,
-    _safe_extract_probs, apply_prompt_variant, get_prototype_card, get_T_star,
-    retrieve_general, retrieve_hierarchical,
+from scripts.step_3_main import (
+    BENCH_LOADERS,
+    BENCH_N_SAMPLES,
+    _compute_metrics,
+    _fmt_evidence,
+    _safe_extract_probs,
+    apply_prompt_variant,
+    get_prototype_card,
+    get_T_star,
+    retrieve_general,
+    retrieve_hierarchical,
 )
-from src.model_client import chat_json  # noqa: E402
-from src.calibrate import apply_temperature  # noqa: E402
-from src.metrics import js_distance, top1_accuracy, tv_distance, wasserstein_1  # noqa: E402
-from src.prompts import render_baseline, to_chat_messages  # noqa: E402
-from src.run_predictions import dispatch_items  # noqa: E402
+from src.calibrate import apply_temperature
+from src.metrics import (
+    js_distance,
+    top1_accuracy,
+    tv_distance,
+    wasserstein_1,
+)
+from src.model_client import chat_json
+from src.prompts import render_baseline, to_chat_messages
+from src.run_predictions import dispatch_items
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logging.getLogger("httpx").setLevel(logging.WARNING)

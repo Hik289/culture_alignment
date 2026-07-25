@@ -1,12 +1,9 @@
-"""统一加载 data/processed/ 下的 parquet (data_scientist 已物化).
+"""Read the materialized benchmark files under ``data/processed``.
 
-设计:
-- 单一入口 BENCH_PATHS 字典 + load_bench(name) 函数
-- 路径默认相对项目根 (`.../culturealignment/`); 可通过 root_dir 覆盖 (hpc 上传 ${EXPERIMENT_ROOT}/)
-- 不依赖 Azure / network, 仅 pandas + pyarrow
-- 不修改原始数据, 只读
+The loaders are read-only and work offline. Paths default to the repository
+root and may be overridden explicitly or through an environment variable.
 
-Benchmarks (data_scientist 输出 schema):
+Materialized benchmark schemas:
 - wvb.probe_distributions : qid, continent, urb_rur, edu, n, distribution, sum, answer_options
 - wvb.probe_manifest      : Question, Question Category, Continent, Urban / Rural, Education, D_INTERVIEW
 - goqa                    : question_id, question, options_parsed, selections_parsed, n_options, n_countries, source, split
@@ -18,9 +15,9 @@ Benchmarks (data_scientist 输出 schema):
 from __future__ import annotations
 
 import os
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 try:
     import pandas as pd
@@ -28,26 +25,25 @@ except ImportError as e:  # noqa: F841
     pd = None  # type: ignore
 
 
-# 项目根 (这个文件的父父级 = .../culturealignment)
 _PKG_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _default_root() -> Path:
-    """按优先级返回项目根:
-    1. 环境变量 CULTUREALIGNMENT_ROOT
-    2. ${EXPERIMENT_ROOT} (hpc 路径)
-    3. _PKG_ROOT (本仓库相对路径, GCP 上)
+    """Resolve the data root in priority order.
+
+    1. ``CULTUREALIGNMENT_ROOT``
+    2. ``EXPERIMENT_ROOT``
+    3. The repository root
     """
-    env = os.environ.get("CULTUREALIGNMENT_ROOT")
-    if env:
-        return Path(env)
-    hpc = Path("${EXPERIMENT_ROOT}")
-    if hpc.exists():
-        return hpc
+    culture_root = os.environ.get("CULTUREALIGNMENT_ROOT")
+    if culture_root:
+        return Path(culture_root)
+    experiment_root = os.environ.get("EXPERIMENT_ROOT")
+    if experiment_root:
+        return Path(experiment_root)
     return _PKG_ROOT
 
 
-# 相对 root 的 parquet 路径
 BENCH_PATHS = {
     "wvb.probe_distributions": "data/processed/wvb/probe_distributions.parquet",
     "wvb.probe_manifest":      "data/processed/wvb/probe_manifest.parquet",
@@ -68,14 +64,14 @@ class BenchHandle:
 
 
 def list_benchmarks(root_dir: str | os.PathLike | None = None) -> list[BenchHandle]:
-    """枚举所有已物化的 benchmark, 返回是否存在 + 行数 + 列名."""
+    """List benchmark availability and, when possible, Parquet metadata."""
     root = Path(root_dir) if root_dir else _default_root()
     out: list[BenchHandle] = []
     for name, rel in BENCH_PATHS.items():
         p = root / rel
         if p.exists() and pd is not None:
             try:
-                # 用 pyarrow 仅读 metadata 不全加载
+                # Read only Parquet metadata to avoid loading each dataset.
                 import pyarrow.parquet as pq  # noqa: WPS433
                 meta = pq.read_metadata(p)
                 schema = pq.read_schema(p)
@@ -97,26 +93,26 @@ def load_bench(
     columns: Iterable[str] | None = None,
     n_rows: int | None = None,
 ):
-    """加载指定 benchmark.
+    """Load a materialized benchmark.
 
     Args:
-        name: 见 BENCH_PATHS keys.
-        root_dir: 覆盖默认项目根.
-        columns: 仅加载子集列 (pyarrow projection, 内存友好).
-        n_rows: 仅取前 n 行 (调试用).
+        name: A key in ``BENCH_PATHS``.
+        root_dir: Optional data-root override.
+        columns: Optional column projection.
+        n_rows: Return at most this many rows.
     Returns:
         pd.DataFrame.
     """
-    if pd is None:
-        raise ImportError("需要 pandas; pip install pandas pyarrow")
     if name not in BENCH_PATHS:
         raise KeyError(
-            f"未知 benchmark {name!r}; 可选: {sorted(BENCH_PATHS.keys())}"
+            f"unknown benchmark {name!r}; choose from {sorted(BENCH_PATHS)}"
         )
+    if pd is None:
+        raise ImportError("pandas and pyarrow are required to load benchmarks")
     root = Path(root_dir) if root_dir else _default_root()
     path = root / BENCH_PATHS[name]
     if not path.exists():
-        raise FileNotFoundError(f"parquet 不存在: {path}")
+        raise FileNotFoundError(f"Parquet file does not exist: {path}")
 
     kwargs: dict = {}
     if columns is not None:
@@ -132,17 +128,17 @@ def load_split(
     split: str,
     *,
     root_dir: str | os.PathLike | None = None,
-) -> "pd.DataFrame":
-    """按 splits/ 目录的 split 文件过滤.
+) -> pd.DataFrame:
+    """Load one split from a manifest under ``data/splits``.
 
     支持的 split 文件:
       - data/splits/{bench}_split.{json,parquet,csv}
-    若不存在, 抛 FileNotFoundError. 留待 data_scientist 落 split.
+    The manifest may be JSON, Parquet, or CSV.
     """
     if pd is None:
-        raise ImportError("需要 pandas")
+        raise ImportError("pandas is required to load split manifests")
     root = Path(root_dir) if root_dir else _default_root()
-    # 优先 json (manifest 风格)
+    # Prefer JSON manifests when several formats are present.
     candidates = [
         root / "data" / "splits" / f"{bench}_split.json",
         root / "data" / "splits" / f"{bench}_split.parquet",
@@ -158,7 +154,7 @@ def load_split(
     if found.suffix == ".json":
         import json
         data = json.loads(found.read_text())
-        # 期望 schema: {split: [id, id, ...]} 或 [{"id":, "split":}, ...]
+        # Accepted forms: {split: [id, ...]} or [{"id": ..., "split": ...}, ...].
         if isinstance(data, dict) and split in data:
             ids = list(data[split])
             return pd.DataFrame({"id": ids, "split": split})
@@ -166,19 +162,18 @@ def load_split(
             df = pd.DataFrame(data)
             if "split" in df.columns:
                 return df[df["split"] == split].reset_index(drop=True)
-        raise ValueError(f"split json 格式不符合预期: {found}")
+        raise ValueError(f"unsupported split JSON schema: {found}")
 
     if found.suffix == ".parquet":
         df = pd.read_parquet(found)
         if "split" in df.columns:
             return df[df["split"] == split].reset_index(drop=True)
-        raise ValueError("split parquet 缺少 'split' 列")
+        raise ValueError("split Parquet file is missing the 'split' column")
 
-    # csv
     df = pd.read_csv(found)
     if "split" in df.columns:
         return df[df["split"] == split].reset_index(drop=True)
-    raise ValueError("split csv 缺少 'split' 列")
+    raise ValueError("split CSV file is missing the 'split' column")
 
 
 __all__ = [

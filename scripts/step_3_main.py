@@ -19,24 +19,28 @@ import sys
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Optional
 
 import numpy as np
-import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.model_client import chat_json, MODEL_NAME  # noqa: E402
-from src.calibrate import apply_temperature  # noqa: E402
-from src.io import load_bench  # noqa: E402
-from src.metrics import (  # noqa: E402
-    accuracy, exact_match, js_distance, macro_f1,
-    token_f1, top1_accuracy, tv_distance, wasserstein_1,
+from src.calibrate import apply_temperature
+from src.io import load_bench
+from src.metrics import (
+    accuracy,
+    exact_match,
+    js_distance,
+    macro_f1,
+    token_f1,
+    top1_accuracy,
+    tv_distance,
+    wasserstein_1,
 )
-from src.prompts import render_baseline, to_chat_messages  # noqa: E402
-from src.retrieval import EvidenceItem  # noqa: E402
-from src.run_predictions import dispatch_items  # noqa: E402
+from src.model_client import chat_json
+from src.prompts import render_baseline, to_chat_messages
+from src.retrieval import EvidenceItem
+from src.run_predictions import dispatch_items
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -45,9 +49,7 @@ logger = logging.getLogger("step3")
 
 JST = timezone(timedelta(hours=9))
 
-CA_ROOT = Path("${EXPERIMENT_ROOT}")
-if not CA_ROOT.exists():
-    CA_ROOT = ROOT
+CA_ROOT = Path(os.environ.get("EXPERIMENT_ROOT", ROOT))
 PROTOTYPES_DIR = CA_ROOT / "data" / "prototypes"
 SPLITS_DIR = CA_ROOT / "data" / "splits"
 EMBEDDINGS_DIR = Path("/tmp/culturelens_rc/embeddings")
@@ -118,7 +120,7 @@ def retrieve_general(query: str, top_k: int = 5) -> list[EvidenceItem]:
     return out
 
 
-def retrieve_hierarchical(query: str, country: str, topic: Optional[str] = None,
+def retrieve_hierarchical(query: str, country: str, topic: str | None = None,
                           top_k: int = 5) -> list[EvidenceItem]:
     R = get_retrievers()
     items = R["items"]
@@ -186,7 +188,7 @@ def _normalize_country(country: str) -> str:
     return COUNTRY_ALIAS.get(c, c)
 
 
-def get_prototype_card(bench: str, country: str) -> Optional[dict]:
+def get_prototype_card(bench: str, country: str) -> dict | None:
     protos = get_prototypes(bench)
     if not protos:
         return None

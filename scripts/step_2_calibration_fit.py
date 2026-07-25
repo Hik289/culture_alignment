@@ -25,29 +25,27 @@ from __future__ import annotations
 import json
 import logging
 import os
-import random
 import sys
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
-import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
+DATA_ROOT = Path(os.environ.get("EXPERIMENT_ROOT", ROOT))
 sys.path.insert(0, str(ROOT))
 
-from src.model_client import chat_json, MODEL_NAME  # noqa: E402
-from src.calibrate import fit_temperature, negative_log_likelihood_from_probs  # noqa: E402
-from src.io import load_bench  # noqa: E402
-from src.prompts import (  # noqa: E402
+from src.calibrate import (
+    fit_temperature,
+)
+from src.io import load_bench
+from src.model_client import MODEL_NAME, chat_json
+from src.prompts import (
     render_baseline,
-    render_norm_judgment,
-    render_survey_distribution,
-    render_daily_knowledge,
     to_chat_messages,
 )
-from src.run_predictions import dispatch_items  # noqa: E402
+from src.run_predictions import dispatch_items
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -95,17 +93,11 @@ def apply_prompt_variant(rendered: dict, variant: int) -> dict:
 
 def collect_wvb_dev(prompt_variant: int) -> tuple[np.ndarray, list[int], list[dict]]:
     """收集 WVB dev (7 qids × all cells) 在 no_culture × prompt_variant 上的 (probs, y_argmax)."""
-    sp = json.load(open(
-        "${EXPERIMENT_ROOT}/data/splits/wvb_split.json"
-        if Path("${EXPERIMENT_ROOT}/data/splits/wvb_split.json").exists()
-        else ROOT / "data" / "splits" / "wvb_split.json"
-    ))
+    sp = json.loads((DATA_ROOT / "data" / "splits" / "wvb_split.json").read_text())
     valid_qids = set(sp["valid"])
-    meta = json.load(open(
-        "${EXPERIMENT_ROOT}/data/processed/wvb/probe_question_metadata.json"
-        if Path("${EXPERIMENT_ROOT}/data/processed/wvb/probe_question_metadata.json").exists()
-        else ROOT / "data" / "processed" / "wvb" / "probe_question_metadata.json"
-    ))
+    meta = json.loads(
+        (DATA_ROOT / "data" / "processed" / "wvb" / "probe_question_metadata.json").read_text()
+    )
     df = load_bench("wvb.probe_distributions")
     df = df[df["qid"].isin(valid_qids)].reset_index(drop=True)
     logger.info("WVB dev: %d cells over %d qids", len(df), len(valid_qids))
@@ -235,11 +227,7 @@ def _run_distribution_dispatch(items, bench):
 # ---------------------------------------------------------------------------
 
 def collect_goqa_dev(prompt_variant: int, sample_n: int = 80) -> tuple[np.ndarray, list[int], list[dict]]:
-    sp = json.load(open(
-        "${EXPERIMENT_ROOT}/data/splits/goqa_split.json"
-        if Path("${EXPERIMENT_ROOT}/data/splits/goqa_split.json").exists()
-        else ROOT / "data" / "splits" / "goqa_split.json"
-    ))
+    sp = json.loads((DATA_ROOT / "data" / "splits" / "goqa_split.json").read_text())
     valid_ids = set(sp["valid"])
     df = load_bench("goqa")
     df = df[df["question_id"].isin(valid_ids)].reset_index(drop=True)
@@ -290,11 +278,7 @@ NORMAD_OPTIONS = ["yes", "no", "neutral"]
 
 
 def collect_normad_dev(prompt_variant: int, sample_n: int = 80):
-    sp = json.load(open(
-        "${EXPERIMENT_ROOT}/data/splits/normad_split.json"
-        if Path("${EXPERIMENT_ROOT}/data/splits/normad_split.json").exists()
-        else ROOT / "data" / "splits" / "normad_split.json"
-    ))
+    sp = json.loads((DATA_ROOT / "data" / "splits" / "normad_split.json").read_text())
     valid_ids = set(sp["valid"])
     df = load_bench("normad")
     df = df[df["story_id"].isin(valid_ids)].reset_index(drop=True)
@@ -337,11 +321,7 @@ def collect_normad_dev(prompt_variant: int, sample_n: int = 80):
 # ---------------------------------------------------------------------------
 
 def collect_blend_mc_dev(prompt_variant: int):
-    sp = json.load(open(
-        "${EXPERIMENT_ROOT}/data/splits/blend_split.json"
-        if Path("${EXPERIMENT_ROOT}/data/splits/blend_split.json").exists()
-        else ROOT / "data" / "splits" / "blend_split.json"
-    ))
+    sp = json.loads((DATA_ROOT / "data" / "splits" / "blend_split.json").read_text())
     valid_ids = set(sp["valid"])
     df = load_bench("blend.mc")
     df = df[df["ID"].isin(valid_ids)].reset_index(drop=True)

@@ -25,13 +25,13 @@ from __future__ import annotations
 import json
 import logging
 import sys
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
-from src.model_client import MODEL_NAME, chat_json  # noqa: E402
+from src.model_client import MODEL_NAME, chat_json
 
 logging.basicConfig(
     level=logging.INFO,

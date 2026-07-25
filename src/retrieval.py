@@ -21,8 +21,9 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from typing import Any, Iterable, Optional, Protocol, Sequence
+from typing import Any, Protocol
 
 import numpy as np
 
@@ -50,12 +51,12 @@ class EvidenceItem:
     """
     id: str
     text: str
-    country: Optional[str] = None
-    topic: Optional[str] = None
-    year: Optional[int] = None
-    source: Optional[str] = None
+    country: str | None = None
+    topic: str | None = None
+    year: int | None = None
+    source: str | None = None
     lang: str = "en"
-    score: Optional[float] = None
+    score: float | None = None
     meta: dict[str, Any] = field(default_factory=dict)
 
 
@@ -72,11 +73,11 @@ class RetrievalQuery:
     exclude_split: 排除某些 split 标记 (避免 test 答案泄漏 → 见 leakage_check)
     """
     text: str
-    country: Optional[str] = None
-    topic: Optional[str] = None
+    country: str | None = None
+    topic: str | None = None
     lang: str = "en"
     top_k: int = 8
-    year_window: Optional[tuple[int, int]] = None
+    year_window: tuple[int, int] | None = None
     exclude_split: Sequence[str] = ()
 
 
@@ -122,7 +123,7 @@ class Retriever(ABC):
     def __init__(self, embedder: Embedder):
         self.embedder = embedder
         self._items: list[EvidenceItem] = []
-        self._embeddings: Optional[np.ndarray] = None
+        self._embeddings: np.ndarray | None = None
         self._built = False
 
     @abstractmethod
@@ -279,12 +280,12 @@ def build_retriever(
 
 
 __all__ = [
-    "EvidenceItem",
-    "RetrievalQuery",
     "Embedder",
-    "IdentityEmbedder",
-    "Retriever",
+    "EvidenceItem",
     "GeneralSemanticRetriever",
     "HierarchicalRetriever",
+    "IdentityEmbedder",
+    "RetrievalQuery",
+    "Retriever",
     "build_retriever",
 ]

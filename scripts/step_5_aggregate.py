@@ -19,8 +19,9 @@ import numpy as np
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.aggregate_results import (  # noqa: E402
-    LOWER_IS_BETTER, ORACLE_FLOOR, bootstrap_ci, headroom_normalized,
+from src.aggregate_results import (
+    bootstrap_ci,
+    headroom_normalized,
     paired_bootstrap_diff,
 )
 

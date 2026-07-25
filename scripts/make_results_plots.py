@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import matplotlib
+
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.patches import Patch
 
-ROOT = Path("${EXPERIMENT_ROOT}")
+ROOT = Path(os.environ.get("EXPERIMENT_ROOT", Path(__file__).resolve().parents[1]))
 ANLY = ROOT / "analysis"
 FIG  = ROOT / "figures"
 FIG.mkdir(parents=True, exist_ok=True)

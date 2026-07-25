@@ -19,25 +19,23 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.build_retrieval_index import (  # noqa: E402
+from src.build_retrieval_index import (
     BuildConfig,
-    BuildResult,
     build_index,
     load_evidence_jsonl,
     make_embedder,
     parse_args,
 )
-from src.calibrate import (  # noqa: E402
+from src.calibrate import (
     apply_temperature,
     fit_temperature,
     negative_log_likelihood_from_probs,
 )
-from src.retrieval import IdentityEmbedder, EvidenceItem  # noqa: E402
-from src.run_predictions import (  # noqa: E402
+from src.retrieval import IdentityEmbedder
+from src.run_predictions import (
     dispatch_items,
     dispatch_items_with_rate_limit,
 )
-
 
 # ---------------------------------------------------------------------------
 # (1) build_retrieval_index
@@ -51,7 +49,7 @@ def _write_evidence_jsonl(path: Path, items: list[dict]) -> None:
 
 class TestLoadEvidenceJsonl:
     def test_basic_load(self):
-        with tempfile.TemporaryResearchery() as td:
+        with tempfile.TemporaryDirectory() as td:
             p = Path(td) / "evidence.jsonl"
             _write_evidence_jsonl(p, [
                 {"id": "e1", "text": "family in Japan", "country": "Japan",
@@ -66,14 +64,14 @@ class TestLoadEvidenceJsonl:
             assert items[1].topic == "religion"
 
     def test_missing_required_field(self):
-        with tempfile.TemporaryResearchery() as td:
+        with tempfile.TemporaryDirectory() as td:
             p = Path(td) / "bad.jsonl"
             _write_evidence_jsonl(p, [{"id": "x"}])  # 没 text
             with pytest.raises(ValueError):
                 load_evidence_jsonl(p)
 
     def test_invalid_json(self):
-        with tempfile.TemporaryResearchery() as td:
+        with tempfile.TemporaryDirectory() as td:
             p = Path(td) / "bad.jsonl"
             p.write_text("{not json}\n")
             with pytest.raises(ValueError):
@@ -84,7 +82,7 @@ class TestLoadEvidenceJsonl:
             load_evidence_jsonl("/nonexistent/path/x.jsonl")
 
     def test_extra_fields_go_to_meta(self):
-        with tempfile.TemporaryResearchery() as td:
+        with tempfile.TemporaryDirectory() as td:
             p = Path(td) / "ev.jsonl"
             _write_evidence_jsonl(p, [
                 {"id": "e", "text": "t", "custom_field": "v", "another": 42},
@@ -93,7 +91,7 @@ class TestLoadEvidenceJsonl:
             assert items[0].meta == {"custom_field": "v", "another": 42}
 
     def test_empty_lines_skipped(self):
-        with tempfile.TemporaryResearchery() as td:
+        with tempfile.TemporaryDirectory() as td:
             p = Path(td) / "ev.jsonl"
             p.write_text('{"id":"a","text":"x"}\n\n\n{"id":"b","text":"y"}\n')
             items = load_evidence_jsonl(p)
@@ -134,7 +132,7 @@ class TestBuildConfig:
 class TestBuildIndex:
     def test_end_to_end_identity(self):
         """识别 embedder + 完整 pipeline 应跑通."""
-        with tempfile.TemporaryResearchery() as td:
+        with tempfile.TemporaryDirectory() as td:
             ev_path = Path(td) / "evidence.jsonl"
             out = Path(td) / "out"
             _write_evidence_jsonl(ev_path, [
@@ -157,7 +155,7 @@ class TestBuildIndex:
             assert result.elapsed_seconds >= 0
 
     def test_only_general(self):
-        with tempfile.TemporaryResearchery() as td:
+        with tempfile.TemporaryDirectory() as td:
             ev_path = Path(td) / "ev.jsonl"
             _write_evidence_jsonl(ev_path, [{"id": "1", "text": "t"}])
             cfg = BuildConfig(
@@ -361,7 +359,7 @@ class TestDataScientistSchema:
 
     def test_data_scientist_schema_load(self):
         """data_sci 用 evidence_id / country_or_region / language / metadata."""
-        with tempfile.TemporaryResearchery() as td:
+        with tempfile.TemporaryDirectory() as td:
             p = Path(td) / "ds_evidence.jsonl"
             # 真实 data_sci 一行 (从 gpu_server 抓的截断版)
             line = {
@@ -395,7 +393,7 @@ class TestDataScientistSchema:
             assert "distribution" in it.meta
 
     def test_data_scientist_schema_missing_text(self):
-        with tempfile.TemporaryResearchery() as td:
+        with tempfile.TemporaryDirectory() as td:
             p = Path(td) / "x.jsonl"
             p.write_text(json.dumps({"evidence_id": "x"}) + "\n")
             with pytest.raises(ValueError):
@@ -403,7 +401,7 @@ class TestDataScientistSchema:
 
     def test_mixed_schemas_in_same_file(self):
         """一个文件里既有 evidence_id 又有 id 的行 — 都能读."""
-        with tempfile.TemporaryResearchery() as td:
+        with tempfile.TemporaryDirectory() as td:
             p = Path(td) / "mixed.jsonl"
             p.write_text(
                 json.dumps({"evidence_id": "ds1", "text": "x", "country_or_region": "Japan"}) + "\n"

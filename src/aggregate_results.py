@@ -17,9 +17,9 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterable, Optional, Sequence
 
 import numpy as np
 
@@ -139,7 +139,7 @@ def paired_bootstrap_diff(
 def aggregate_runs(
     summaries: list[RunSummary],
     *,
-    metric_keys: Optional[Sequence[str]] = None,
+    metric_keys: Sequence[str] | None = None,
     n_boot: int = 1000,
 ) -> list[dict]:
     """按 (method, benchmark, metric) 聚合 over (prompt_variant, seed).
@@ -191,7 +191,7 @@ LOWER_IS_BETTER = {
 
 def headroom_normalized(
     method_value: float, baseline_value: float, metric_key: str,
-) -> Optional[float]:
+) -> float | None:
     """Δ / (baseline - oracle).
 
     对 lower-is-better metric: Δ = baseline - method (越正越好)
@@ -313,15 +313,15 @@ def compare_table_markdown(rows: list[dict]) -> str:
 
 
 __all__ = [
-    "RunSummary",
-    "load_run_summaries",
-    "bootstrap_ci",
-    "paired_bootstrap_diff",
-    "aggregate_runs",
-    "headroom_normalized",
-    "compare_to_baseline",
-    "main_table_markdown",
-    "compare_table_markdown",
-    "ORACLE_FLOOR",
     "LOWER_IS_BETTER",
+    "ORACLE_FLOOR",
+    "RunSummary",
+    "aggregate_runs",
+    "bootstrap_ci",
+    "compare_table_markdown",
+    "compare_to_baseline",
+    "headroom_normalized",
+    "load_run_summaries",
+    "main_table_markdown",
+    "paired_bootstrap_diff",
 ]

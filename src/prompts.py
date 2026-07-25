@@ -17,7 +17,8 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Mapping, Sequence
+from collections.abc import Mapping, Sequence
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # 系统提示
@@ -445,9 +446,9 @@ def to_chat_messages(rendered: Mapping[str, Any]) -> list[dict]:
 
 __all__ = [
     "SYSTEM_PROMPT",
-    "render_survey_distribution",
-    "render_norm_judgment",
-    "render_daily_knowledge",
     "render_baseline",
+    "render_daily_knowledge",
+    "render_norm_judgment",
+    "render_survey_distribution",
     "to_chat_messages",
 ]

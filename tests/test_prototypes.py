@@ -7,16 +7,14 @@ import sys
 import tempfile
 from pathlib import Path
 
-import pytest
-
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.prototypes import (  # noqa: E402
+from src.prototypes import (
     DEFAULT_WARNING,
     LLMSummarizerProtoBuilder,
-    PrototypeCard,
     ProtoBuilder,
+    PrototypeCard,
     RuleBasedProtoBuilder,
     group_evidence_by_country,
 )
@@ -138,7 +136,7 @@ class TestRuleBasedProto:
         b = RuleBasedProtoBuilder()
         groups = group_evidence_by_country(_sample_evidence())
         cards = b.build_many(groups)
-        with tempfile.TemporaryResearchery() as td:
+        with tempfile.TemporaryDirectory() as td:
             p = Path(td) / "proto.json"
             b.dump(cards, p)
             loaded = ProtoBuilder.load(p)

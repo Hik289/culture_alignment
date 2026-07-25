@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import datetime
 import json
+import os
 import re
 import statistics
 import sys
@@ -17,7 +18,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-ROOT     = Path("${EXPERIMENT_ROOT}")
+ROOT = Path(os.environ.get("EXPERIMENT_ROOT", Path(__file__).resolve().parents[2]))
 EVID_DIR = ROOT / "data/evidence"
 PROTO    = ROOT / "data/prototypes"
 SPLT     = ROOT / "data/splits"
@@ -262,7 +263,7 @@ for bench, cards in protos.items():
 
 # ── 4) Re-scan leakage ─────────────────────────────────────────────────────
 print("\n[4/4] Re-scanning leakage on canonical evidence ...")
-from leakage_check import normalize_text, text_hash, _get_model
+from leakage_check import _get_model, normalize_text, text_hash
 
 DC = RAW / "worldvaluesbench/repo/dataset_construction"
 wvb_value_qs = json.load(open(DC / "probe_set_construction/value_questions.json"))

@@ -1,23 +1,8 @@
-"""检索索引构建脚本骨架 (RUNNING 阶段实施前的接口契约).
+"""Build retrieval indexes from a validated evidence JSONL file.
 
-RUNNING 工作流 (data_scientist evidence 落后):
-  1. 加载 data/evidence/evidence.jsonl → List[EvidenceItem]
-  2. 选 embedder (默认 sentence-transformers/all-MiniLM-L6-v2, 384-d)
-  3. 编码 + 持久化 embedding_cache.npy (~242 MB, 放 /tmp)
-  4. 建 General + Hierarchical retriever 实例, build()
-  5. 序列化 FAISS index (中间方法配置放 /tmp; 最终 CultureLens-RC 配置放 persistent)
-
-骨架现在做的:
-- 数据契约 (BuildConfig + BuildResult)
-- evidence jsonl 加载 + 校验
-- IdentityEmbedder fallback (供单元测试用, 真 embed 等 RUNNING 阶段)
-- pipeline 函数 build_index(config) 接口
-- CLI
-
-不做的事:
-- 不调 sentence-transformers (避免下载模型 + 占盘)
-- 不写真 FAISS index (避免 evidence 未落时报错)
-- 不调 LLM
+The identity embedder provides a deterministic offline test path. Production
+runs may select a sentence-transformer; FAISS is used when installed, with a
+NumPy index fallback otherwise.
 """
 
 from __future__ import annotations
@@ -29,21 +14,19 @@ import os
 import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Iterable, Optional
 
 logger = logging.getLogger(__name__)
 
-# 添加 src 到 path 供模块自调用
+# Support direct execution from the repository root.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.retrieval import (  # noqa: E402
-    EvidenceItem,
+from src.retrieval import (
     Embedder,
-    IdentityEmbedder,
+    EvidenceItem,
     GeneralSemanticRetriever,
     HierarchicalRetriever,
+    IdentityEmbedder,
 )
-
 
 # ---------------------------------------------------------------------------
 # Config
@@ -59,7 +42,7 @@ class BuildConfig:
     batch_size: int = 64
     index_kinds: tuple[str, ...] = ("general", "hierarchical")
     cache_embeddings: bool = True
-    persistent_only_final: bool = True  # 中间索引放 /tmp, 最终放 persistent
+    persistent_only_final: bool = True
 
     def validate(self) -> None:
         if self.embedder_kind not in ("identity", "sentence_transformers"):
@@ -75,7 +58,7 @@ class BuildConfig:
 class BuildResult:
     config: BuildConfig
     n_evidence: int = 0
-    embedding_cache_path: Optional[str] = None
+    embedding_cache_path: str | None = None
     index_paths: dict[str, str] = field(default_factory=dict)
     elapsed_seconds: float = 0.0
 
@@ -89,29 +72,27 @@ class BuildResult:
 # ---------------------------------------------------------------------------
 
 def load_evidence_jsonl(path: str | os.PathLike) -> list[EvidenceItem]:
-    """加载 data/evidence/evidence.jsonl (data_scientist 产出).
+    """Load and validate evidence records.
 
     支持两种 schema:
 
-    (A) data_scientist 真 schema (优先匹配):
+    (A) Materialized schema:
         evidence_id / text / country_or_region / topic / source / language / task_type / ...
 
-    (B) 简化 schema (向后兼容):
+    (B) Legacy compact schema:
         id / text / country / topic / year / source / lang
 
-    必需字段 (任一 schema): (evidence_id 或 id) + text.
-    其他字段 → EvidenceItem.meta dict.
+    Both require ``text`` and either ``evidence_id`` or ``id``. Unrecognized
+    fields are retained in ``EvidenceItem.meta``.
     """
     p = Path(path)
     if not p.exists():
         raise FileNotFoundError(f"evidence file not found: {p}")
     items: list[EvidenceItem] = []
 
-    # data_sci schema 的字段映射 → EvidenceItem fields
     KNOWN_DS = {
         "evidence_id", "text", "country_or_region", "topic",
         "source", "language", "score",
-        # 这些进 meta:
         "split", "task_type", "answer_options", "distribution",
         "label", "short_answers", "metadata", "indexed_at", "license",
     }
@@ -127,16 +108,12 @@ def load_evidence_jsonl(path: str | os.PathLike) -> list[EvidenceItem]:
             except json.JSONDecodeError as e:
                 raise ValueError(f"{p}:{line_no} invalid JSON: {e}")
 
-            # Schema 判定
             if "evidence_id" in d:
-                # data_sci schema
                 if "text" not in d:
                     raise ValueError(f"{p}:{line_no} missing text")
-                # year 字段在 data_sci schema 没有, 留 None (RUNNING 阶段若有 metadata.wvs_wave 等可推断)
                 year = None
                 metadata = d.get("metadata") or {}
                 if isinstance(metadata, dict):
-                    # 试着抓常见 year 字段
                     for k in ("year", "wvs_wave", "publication_year"):
                         if k in metadata:
                             try:
@@ -145,7 +122,7 @@ def load_evidence_jsonl(path: str | os.PathLike) -> list[EvidenceItem]:
                             except (ValueError, TypeError):
                                 pass
                 meta = {k: v for k, v in d.items() if k not in KNOWN_DS}
-                # 把 schema 里其他 useful 字段也存进 meta 供下游用
+                # Preserve fields used by filtering and downstream analysis.
                 for k in ("split", "task_type", "answer_options", "distribution", "label"):
                     if k in d:
                         meta[k] = d[k]
@@ -160,7 +137,6 @@ def load_evidence_jsonl(path: str | os.PathLike) -> list[EvidenceItem]:
                     meta=meta,
                 ))
             elif "id" in d:
-                # simple schema
                 if "text" not in d:
                     raise ValueError(f"{p}:{line_no} missing text")
                 meta = {k: v for k, v in d.items() if k not in KNOWN_SIMPLE}
@@ -186,24 +162,17 @@ def load_evidence_jsonl(path: str | os.PathLike) -> list[EvidenceItem]:
 # ---------------------------------------------------------------------------
 
 class SentenceTransformerEmbedder:
-    """sentence-transformers 包装. RUNNING 阶段调用真模型.
-
-    contract:
-      - encode(list[str]) -> np.ndarray of shape (N, D), float32
-      - 输出 L2 normalized (因为 retrieval.py 用 dot product = cosine)
-      - 内部 batch encoding, 显示 progress
-    """
+    """Thin sentence-transformers adapter returning normalized float32 arrays."""
 
     def __init__(self, model_name: str = "sentence-transformers/all-MiniLM-L6-v2",
                  batch_size: int = 64, device: str | None = None,
                  normalize: bool = True):
-        # 惰性 import (单元测试不需要它时不触发下载)
+        # Import lazily so offline identity-embedder tests need no model package.
         from sentence_transformers import SentenceTransformer
         self.model_name = model_name
         self.batch_size = batch_size
         self.normalize = normalize
         self.model = SentenceTransformer(model_name, device=device)
-        # 自动 dim
         self.dim = self.model.get_sentence_embedding_dimension()
 
     def encode(self, texts: list[str]):
@@ -221,11 +190,7 @@ class SentenceTransformerEmbedder:
 
 
 def make_embedder(config: BuildConfig) -> Embedder:
-    """工厂.
-
-    - 'identity': 单元测试用 (hash-based deterministic)
-    - 'sentence_transformers': RUNNING 阶段用真模型 (anchor_5 已用 all-MiniLM-L6-v2)
-    """
+    """Construct the deterministic test or sentence-transformer embedder."""
     if config.embedder_kind == "identity":
         return IdentityEmbedder(dim=config.embedder_dim)
     if config.embedder_kind == "sentence_transformers":
@@ -241,16 +206,7 @@ def make_embedder(config: BuildConfig) -> Embedder:
 # ---------------------------------------------------------------------------
 
 def build_index(config: BuildConfig) -> BuildResult:
-    """主流程.
-
-    流程:
-      1. 加载 evidence.jsonl
-      2. 实例化 embedder (identity / sentence_transformers)
-      3. 用 GeneralSemanticRetriever.build() 编码 + 保存 embeddings.npy
-      4. (Hierarchical 共享 embeddings, 不重复编码)
-      5. 持久化 FAISS index (faiss 可用时) 或 npy fallback
-      6. 序列化 items metadata (供 search 时映射 idx → EvidenceItem)
-    """
+    """Build shared embeddings, search index files, and item metadata."""
     import time
     config.validate()
     t0 = time.time()
@@ -263,7 +219,7 @@ def build_index(config: BuildConfig) -> BuildResult:
     out_dir.mkdir(parents=True, exist_ok=True)
     result = BuildResult(config=config, n_evidence=len(items))
 
-    # Step 1: 编码 (使用 GeneralSemantic 内部 build 触发 embed)
+    # Build embeddings once and share them across retrieval strategies.
     r_general = None
     embeddings = None
     if "general" in config.index_kinds or config.cache_embeddings:
@@ -277,13 +233,12 @@ def build_index(config: BuildConfig) -> BuildResult:
             result.embedding_cache_path = str(cache_path)
             logger.info("cached embeddings %s shape=%s", cache_path, embeddings.shape)
 
-    # Step 2: FAISS index 持久化 (cosine = IndexFlatIP because 向量已 normalize)
+    # Normalized embeddings make inner product equivalent to cosine similarity.
     if "general" in config.index_kinds and embeddings is not None and embeddings.size > 0:
         path = _persist_faiss_index(embeddings, out_dir / "general.faiss")
         result.index_paths["general"] = str(path)
 
-    # Step 3: Hierarchical retriever 共享同一份 embeddings (filter 在 query 时做, 不需要独立 index).
-    # 不重复写文件 (节约 ~70MB per index).
+    # Hierarchical filtering happens at query time, so it shares the same index.
     if "hierarchical" in config.index_kinds:
         r_hier = HierarchicalRetriever(embedder)
         if r_general is not None and embeddings is not None:
@@ -293,14 +248,12 @@ def build_index(config: BuildConfig) -> BuildResult:
         else:
             r_hier.build(items)
         if "general" in result.index_paths:
-            # 标记 hierarchical 与 general 共享底层 index/embeddings
             result.index_paths["hierarchical_shares_with_general"] = result.index_paths["general"]
         elif embeddings is not None and embeddings.size > 0:
-            # 仅建 hierarchical 时才独立写
             path = _persist_faiss_index(embeddings, out_dir / "hierarchical.faiss")
             result.index_paths["hierarchical"] = str(path)
 
-    # Step 4: items metadata (idx → meta, 供 search 时映射)
+    # Preserve the row-to-record mapping required when decoding search results.
     if items:
         meta_path = out_dir / "items_meta.jsonl"
         with meta_path.open("w") as f:
@@ -313,11 +266,7 @@ def build_index(config: BuildConfig) -> BuildResult:
 
 
 def _persist_faiss_index(embeddings, out_path: Path) -> Path:
-    """持久化 embeddings 为 FAISS index. faiss 不可用时降级为 .npy.
-
-    用 IndexFlatIP (内积) 因为 embeddings 已 L2-normalized → cosine sim.
-    46k records × 384 dim × 4 byte = 71 MB, IVF 不必要.
-    """
+    """Persist an inner-product FAISS index, or a NumPy fallback."""
     out_path = Path(out_path)
     try:
         import faiss  # type: ignore
@@ -384,11 +333,11 @@ def main(argv: list[str] | None = None) -> None:
 __all__ = [
     "BuildConfig",
     "BuildResult",
-    "load_evidence_jsonl",
-    "make_embedder",
     "build_index",
-    "parse_args",
+    "load_evidence_jsonl",
     "main",
+    "make_embedder",
+    "parse_args",
 ]
 
 

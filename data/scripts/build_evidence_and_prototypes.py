@@ -27,7 +27,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-ROOT     = Path("${EXPERIMENT_ROOT}")
+ROOT = Path(os.environ.get("EXPERIMENT_ROOT", Path(__file__).resolve().parents[2]))
 RAW      = ROOT / "data/raw"
 PROC     = ROOT / "data/processed"
 SPLT     = ROOT / "data/splits"
@@ -160,7 +160,7 @@ def build_wvb_evidence() -> list[dict]:
                     "answer_data_type": meta.get("answer_data_type", "ordinal"),
                     "wvs_wave": 7,
                     "wvs_version": "6.0",
-                    "n_respondents": int(len(vals_int)),
+                    "n_respondents": len(vals_int),
                 },
                 license_tag="WVSA-restricted (WVS Wave 7 v6.0)",
             )
@@ -175,7 +175,7 @@ def build_wvb_evidence() -> list[dict]:
 # =============================================================================
 def parse_selections(s: str) -> dict:
     if not isinstance(s, str): return {}
-    m = re.search(r"\{.*\}", s, re.S)
+    m = re.search(r"\{.*\}", s, re.DOTALL)
     if not m: return {}
     try: return ast.literal_eval(m.group(0))
     except Exception: return {}
@@ -478,14 +478,14 @@ def build_prototypes(all_records: list[dict], resource_grouping: dict) -> dict:
                     f"no={labels.get('no',0)/max(total,1)*100:.0f}%, "
                     f"neutral={labels.get('neutral',0)/max(total,1)*100:.0f}% "
                     f"(NormAd-Eti, Rao et al. 2024)")
-                bullets.append(f"高频礼仪子轴: " + ", ".join(f"{s}({n})" for s,n in top_subax))
+                bullets.append("高频礼仪子轴: " + ", ".join(f"{s}({n})" for s,n in top_subax))
                 bullets.append("Cultural Atlas 来源, 概括性社会规范, 不覆盖区域/族群细分差异; "
                                "具体场景可受时代/年龄/宗教多重影响。")
             elif bench_key == "blend":
                 topics = Counter(r["topic"] for r in recs)
                 bullets = []
                 top_t = topics.most_common(3)
-                bullets.append(f"高频日常文化主题: " + ", ".join(f"{t}({n})" for t,n in top_t))
+                bullets.append("高频日常文化主题: " + ", ".join(f"{t}({n})" for t,n in top_t))
                 avg_resp = np.mean([r["metadata"]["respondent_count"] for r in recs])
                 bullets.append(f"每问平均 {avg_resp:.1f} 位受访者短答案 (BLEnD train split, 2024); "
                                f"覆盖 {len(recs)} 个 (qid×country) 对")
@@ -534,7 +534,7 @@ def run_leakage_scan(all_records: list[dict]) -> dict:
     R4: embedding cosine ≥ 0.95 (full multilingual model; may be slow, sample 500 evidence per benchmark
         for embedding scan due to cost; full text-hash + qid scan is cheap and is the hard guarantee)
     """
-    from leakage_check import normalize_text, text_hash, LeakageChecker
+    from leakage_check import normalize_text, text_hash
 
     # ---------- Build per-source TEST question pools ----------
     # WVB: 36 probe questions (the canonical eval text)
@@ -772,8 +772,7 @@ def main():
     # 6) Write evidence.jsonl
     out_jsonl = EVID_DIR / "evidence.jsonl"
     with open(out_jsonl, "w") as f:
-        for r in clean:
-            f.write(json.dumps(r, ensure_ascii=False, default=str) + "\n")
+        f.writelines(json.dumps(r, ensure_ascii=False, default=str) + "\n" for r in clean)
     print(f"\nWrote {out_jsonl} ({len(clean)} records)")
 
     # 7) Stats summary (small, rsync to GCP)

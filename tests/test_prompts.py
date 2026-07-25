@@ -17,7 +17,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.prompts import (  # noqa: E402
+from src.prompts import (
     SYSTEM_PROMPT,
     render_baseline,
     render_daily_knowledge,
@@ -25,7 +25,6 @@ from src.prompts import (  # noqa: E402
     render_survey_distribution,
     to_chat_messages,
 )
-
 
 REAL_EVIDENCE = [
     {
@@ -297,7 +296,7 @@ class TestBaselines:
 # 全 placeholder 扫描 — 任一模板渲染后, 不应残留 {xxx} 占位符
 # ---------------------------------------------------------------------------
 
-import re  # noqa: E402
+import re
 
 _PH_RE = re.compile(r"\{[a-z_][a-z0-9_]*\}")
 
@@ -362,9 +361,9 @@ class TestNoLeftoverPlaceholders:
 # 能正确解析这个 JSON, 且符合 prompts.py 在文本中声明的字段约束.
 # ---------------------------------------------------------------------------
 
-import json  # noqa: E402
+import json
 
-from src.model_client import _try_parse_json  # noqa: E402
+from src.model_client import _try_parse_json
 
 
 def _extract_schema_block(user_text: str) -> str | None:

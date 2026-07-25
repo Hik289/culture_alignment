@@ -17,12 +17,23 @@ Reference numbers (official):
   NormAd #stories = 2633 ; #countries = 75 ; 3 labels (yes/no/neutral)
   BLEnD  #countries (annotation files) = 16 ; #base questions = 52 (cross-product 16x52 minus invalid ~ 52*16 < ); MC questions ~ 52*16 with variants
 """
-import json, hashlib, datetime, os, sys, csv, re, random, ast, glob
-from collections import defaultdict, Counter
-import pandas as pd
-import numpy as np
+import ast
+import datetime
+import glob
+import hashlib
+import json
+import os
+import random
+import re
+from collections import Counter
 
-ROOT = "${EXPERIMENT_ROOT}"
+import numpy as np
+import pandas as pd
+
+ROOT = os.environ.get(
+    "EXPERIMENT_ROOT",
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+)
 RAW  = f"{ROOT}/data/raw"
 PROC = f"{ROOT}/data/processed"
 SPLT = f"{ROOT}/data/splits"
@@ -215,7 +226,7 @@ print(f"  rows={n_rows}, cols={df.columns.tolist()}")
 def parse_selections(s):
     # raw form: "defaultdict(<class 'list'>, {'X': [..], 'Y': [..]})"
     if not isinstance(s, str): return {}
-    m = re.search(r"\{.*\}", s, re.S)
+    m = re.search(r"\{.*\}", s, re.DOTALL)
     if not m: return {}
     try:
         d = ast.literal_eval(m.group(0))
@@ -262,7 +273,7 @@ countries_all = sorted({c for d in df['selections_parsed'] for c in d.keys()})
 sources_all   = sorted(df['source'].dropna().unique().tolist())
 
 assrt("goqa.n_questions_dedup_in_official_range",
-      2400 <= len(df) <= 2700, "2400-2700 (Durmus et al. 2023 ~2556)", int(len(df)),
+      2400 <= len(df) <= 2700, "2400-2700 (Durmus et al. 2023 ~2556)", len(df),
       tol="range", note="Anthropic card reports ~2556 questions; dedup may shift slightly")
 assrt("goqa.distribution_sum_1_per_country",
       n_dist_sum_ok / max(len(df),1) > 0.95,
@@ -297,7 +308,7 @@ goqa_split = {
         "train":int((df_shuf.split=='train').sum()),
         "valid":int((df_shuf.split=='valid').sum()),
         "test" :int((df_shuf.split=='test').sum()),
-        "total":int(len(df_shuf)),
+        "total":len(df_shuf),
     },
     "note":"Stratified by survey source so all 3 splits see GAS/PEW/WVS. Strictly question-id grouped so no within-question country leakage."
 }
@@ -320,7 +331,7 @@ top_countries = country_q_count.most_common(10)
 
 eda['goqa'] = {
     "name":"GlobalOpinionQA",
-    "n_questions_after_dedup": int(len(df)),
+    "n_questions_after_dedup": len(df),
     "n_options_distribution": dict(Counter(df['n_options'].tolist()).most_common()),
     "n_countries_total": len(countries_all),
     "sources": sources_all,

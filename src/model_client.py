@@ -25,8 +25,9 @@ import os
 import random
 import re
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Any, Callable, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -64,16 +65,16 @@ ERR_OTHER = "other"
 class CallResult:
     """单次 chat 调用结果."""
     ok: bool
-    content: Optional[str]
-    parsed: Optional[Any]
+    content: str | None
+    parsed: Any | None
     prompt_tokens: int = 0
     completion_tokens: int = 0
     total_tokens: int = 0
     latency_seconds: float = 0.0
     n_attempts: int = 1
-    error: Optional[str] = None
-    error_type: Optional[str] = None
-    finish_reason: Optional[str] = None
+    error: str | None = None
+    error_type: str | None = None
+    finish_reason: str | None = None
     used_fallback_json: bool = False
     attempt_log: list = field(default_factory=list)
 
@@ -92,13 +93,13 @@ def _get_token_provider() -> Callable[[], str]:
     api_key = os.environ.get(ENV_API_KEY)
     if api_key:
         logger.info("auth: using LLM_API_KEY env var")
-        return lambda: api_key  # noqa: E731
+        return lambda: api_key
 
     for env_name in EXTRA_ENV_API_KEYS:
         api_key = os.environ.get(env_name)
         if api_key:
             logger.info("auth: using MODEL_API_KEY env var")
-            return lambda: api_key  # noqa: E731
+            return lambda: api_key
 
     raise RuntimeError("Set LLM_API_KEY before running model API experiments.")
 
@@ -123,7 +124,7 @@ def _build_client(token_provider: Callable[[], str]):
 _FENCE_RE = re.compile(r"```(?:json)?\s*(.+?)\s*```", re.DOTALL | re.IGNORECASE)
 
 
-def _try_parse_json(content: str) -> tuple[Optional[Any], bool, Optional[str]]:
+def _try_parse_json(content: str) -> tuple[Any | None, bool, str | None]:
     """尝试解析 JSON. 返回 (parsed, used_fallback, error_msg).
 
     Fallback 顺序:
@@ -185,7 +186,7 @@ def _try_parse_json(content: str) -> tuple[Optional[Any], bool, Optional[str]]:
 # 错误分类
 # ---------------------------------------------------------------------------
 
-def _classify_exc(e: Exception) -> tuple[str, Optional[float]]:
+def _classify_exc(e: Exception) -> tuple[str, float | None]:
     """根据 chat-completions SDK 抛出的异常分类. 返回 (error_type, retry_after_seconds_hint)."""
     # 惰性导入避免没装 model client SDK 时炸
     try:
@@ -241,11 +242,11 @@ def chat_json(
     model: str = MODEL_NAME,
     max_retries: int = 2,
     temperature: float = 0.0,
-    response_format: Optional[dict] = None,
-    extra_kwargs: Optional[dict] = None,
+    response_format: dict | None = None,
+    extra_kwargs: dict | None = None,
     base_backoff: float = 1.0,
     max_backoff: float = 30.0,
-    timeout: Optional[float] = 60.0,
+    timeout: float | None = 60.0,
 ) -> CallResult:
     """同步调用配置的模型 API, 强制 JSON 输出.
 
@@ -271,8 +272,8 @@ def chat_json(
     client = _build_client(token_provider)
 
     attempt_log: list[dict] = []
-    last_err: Optional[str] = None
-    last_err_type: Optional[str] = None
+    last_err: str | None = None
+    last_err_type: str | None = None
     total_pt = total_ct = total_tt = 0
 
     for attempt in range(max_retries + 1):
@@ -408,17 +409,17 @@ def chat_json(
 
 
 __all__ = [
+    "ERR_AUTH",
+    "ERR_BAD_REQUEST",
+    "ERR_CONNECTION",
+    "ERR_EMPTY",
+    "ERR_JSON",
+    "ERR_OTHER",
+    "ERR_RATE_LIMIT",
+    "ERR_SERVER",
+    "ERR_TIMEOUT",
     "MODEL_API_BASE_URL",
     "MODEL_NAME",
     "CallResult",
     "chat_json",
-    "ERR_AUTH",
-    "ERR_RATE_LIMIT",
-    "ERR_SERVER",
-    "ERR_TIMEOUT",
-    "ERR_CONNECTION",
-    "ERR_BAD_REQUEST",
-    "ERR_JSON",
-    "ERR_EMPTY",
-    "ERR_OTHER",
 ]

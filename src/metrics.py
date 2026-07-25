@@ -18,7 +18,8 @@ import math
 import re
 import string
 from collections import Counter
-from typing import Iterable, List, Sequence, Tuple, Union
+from collections.abc import Iterable, Sequence
+from typing import Union
 
 import numpy as np
 
@@ -312,19 +313,19 @@ def token_f1_corpus(preds: Sequence[str], golds: Sequence[Sequence[str] | str]) 
 
 
 __all__ = [
-    "wasserstein_1",
-    "js_divergence",
-    "js_distance",
-    "kl_divergence",
-    "tv_distance",
-    "top1_accuracy",
     "accuracy",
+    "brier_score",
+    "exact_match",
+    "exact_match_corpus",
+    "expected_calibration_error",
+    "js_distance",
+    "js_divergence",
+    "kl_divergence",
     "macro_f1",
     "negative_log_likelihood",
-    "brier_score",
-    "expected_calibration_error",
-    "exact_match",
     "token_f1",
-    "exact_match_corpus",
     "token_f1_corpus",
+    "top1_accuracy",
+    "tv_distance",
+    "wasserstein_1",
 ]

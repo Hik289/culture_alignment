@@ -9,14 +9,16 @@
 Also re-run prototype + resource_grouping rebuild on the updated names.
 No need to re-scan leakage (we are only consolidating equivalent names; no new evidence).
 """
-import json
 import datetime
+import json
+import os
 import statistics
 from collections import Counter, defaultdict
 from pathlib import Path
+
 import numpy as np
 
-ROOT = Path("${EXPERIMENT_ROOT}")
+ROOT = Path(os.environ.get("EXPERIMENT_ROOT", Path(__file__).resolve().parents[2]))
 EVID = ROOT / "data/evidence/evidence.jsonl"
 PROTO = ROOT / "data/prototypes"
 ANLY = ROOT / "analysis"

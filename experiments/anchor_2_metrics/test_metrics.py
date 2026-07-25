@@ -17,7 +17,6 @@ from datetime import datetime
 from pathlib import Path
 
 import numpy as np
-import pytest
 
 # 让 src 包能被 import (pytest 从项目根运行)
 ROOT = Path(__file__).resolve().parents[2]

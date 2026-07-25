@@ -22,9 +22,10 @@ import json
 import logging
 from abc import ABC, abstractmethod
 from collections import Counter, defaultdict
+from collections.abc import Iterable, Sequence
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Iterable, Optional, Sequence
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -188,7 +189,7 @@ class LLMSummarizerProtoBuilder(ProtoBuilder):
         - 失败 → fallback 到 RuleBasedProtoBuilder.build_one
     """
 
-    def __init__(self, *, max_evidence: int = 20, fallback: Optional[ProtoBuilder] = None):
+    def __init__(self, *, max_evidence: int = 20, fallback: ProtoBuilder | None = None):
         self.max_evidence = max_evidence
         self.fallback = fallback or RuleBasedProtoBuilder()
 
@@ -231,9 +232,9 @@ def group_evidence_by_country(
 
 __all__ = [
     "DEFAULT_WARNING",
-    "PrototypeCard",
-    "ProtoBuilder",
-    "RuleBasedProtoBuilder",
     "LLMSummarizerProtoBuilder",
+    "ProtoBuilder",
+    "PrototypeCard",
+    "RuleBasedProtoBuilder",
     "group_evidence_by_country",
 ]

@@ -28,29 +28,29 @@ import os
 import random
 import sys
 import time
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[2]
+DATA_ROOT = Path(os.environ.get("EXPERIMENT_ROOT", ROOT))
 sys.path.insert(0, str(ROOT))
 
-from src.model_client import chat_json, MODEL_NAME  # noqa: E402
-from src.io import BENCH_PATHS, load_bench  # noqa: E402
-from src.metrics import (  # noqa: E402
+from src.io import load_bench
+from src.metrics import (
     accuracy,
     exact_match,
     js_distance,
-    js_divergence,
     macro_f1,
     token_f1,
     top1_accuracy,
     tv_distance,
     wasserstein_1,
 )
-from src.prompts import render_baseline, to_chat_messages  # noqa: E402
+from src.model_client import MODEL_NAME, chat_json
+from src.prompts import render_baseline, to_chat_messages
 
 logging.basicConfig(
     level=logging.INFO,
@@ -190,10 +190,10 @@ def _safe_answer(parsed: dict, options: list[str] | None = None) -> str | None:
 def run_wvb(out_records: list, sample_n: int = N_WVB) -> dict:
     logger.info("=== WVB (n=%d) ===", sample_n)
     df = load_bench("wvb.probe_distributions")
-    meta = json.load(
-        open("${EXPERIMENT_ROOT}/data/processed/wvb/probe_question_metadata.json")
-        if Path("${EXPERIMENT_ROOT}/data/processed/wvb/probe_question_metadata.json").exists()
-        else ROOT / "data" / "processed" / "wvb" / "probe_question_metadata.json"
+    meta = json.loads(
+        (
+            DATA_ROOT / "data" / "processed" / "wvb" / "probe_question_metadata.json"
+        ).read_text()
     )
     sample = _sample(df, sample_n)
 
@@ -244,9 +244,9 @@ def run_wvb(out_records: list, sample_n: int = N_WVB) -> dict:
 
     return {
         "bench": "wvb",
-        "n_sampled": int(len(sample)),
+        "n_sampled": len(sample),
         "n_failed": int(fails),
-        "n_evaluated": int(len(w1_list)),
+        "n_evaluated": len(w1_list),
         "metrics": {
             "W1_mean": float(np.mean(w1_list)) if w1_list else None,
             "W1_std": float(np.std(w1_list)) if w1_list else None,
@@ -309,9 +309,9 @@ def run_goqa(out_records: list, sample_n: int = N_GOQA) -> dict:
 
     return {
         "bench": "goqa",
-        "n_sampled": int(len(sample)),
+        "n_sampled": len(sample),
         "n_failed": int(fails),
-        "n_evaluated": int(len(jsd_list)),
+        "n_evaluated": len(jsd_list),
         "metrics": {
             "JS_distance_mean": float(np.mean(jsd_list)) if jsd_list else None,
             "JS_similarity_proxy": float(1.0 - np.mean(jsd_list)) if jsd_list else None,
@@ -333,9 +333,7 @@ def run_normad(out_records: list, sample_n: int = N_NORMAD) -> dict:
     logger.info("=== NormAd (n=%d) ===", sample_n)
     df = load_bench("normad")
     split = pd.read_csv(
-        "${EXPERIMENT_ROOT}/data/processed/normad/story_id_split.csv"
-        if Path("${EXPERIMENT_ROOT}/data/processed/normad/story_id_split.csv").exists()
-        else ROOT / "data" / "processed" / "normad" / "story_id_split.csv"
+        DATA_ROOT / "data" / "processed" / "normad" / "story_id_split.csv"
     )
     test_ids = set(split[split["split"] == "test"]["story_id"])
     test_df = df[df["story_id"].isin(test_ids)].reset_index(drop=True)
@@ -397,9 +395,9 @@ def run_normad(out_records: list, sample_n: int = N_NORMAD) -> dict:
 
     return {
         "bench": "normad",
-        "n_sampled": int(len(sample)),
+        "n_sampled": len(sample),
         "n_failed": int(fails),
-        "n_evaluated": int(len(y_true)),
+        "n_evaluated": len(y_true),
         "metrics": {
             "Accuracy": acc,
             "Macro_F1": mf1,
@@ -481,9 +479,9 @@ def run_blend_mc(out_records: list, sample_n: int = N_BLEND_MC) -> dict:
     acc = accuracy(y_true, y_pred) if y_true else None
     return {
         "bench": "blend_mc",
-        "n_sampled": int(len(sample)),
+        "n_sampled": len(sample),
         "n_failed": int(fails),
-        "n_evaluated": int(len(y_true)),
+        "n_evaluated": len(y_true),
         "metrics": {"Accuracy": acc},
     }
 
@@ -495,9 +493,16 @@ def run_blend_mc(out_records: list, sample_n: int = N_BLEND_MC) -> dict:
 def run_blend_saq(out_records: list, sample_n: int = N_BLEND_SAQ) -> dict:
     logger.info("=== BLEnD SAQ (n=%d) ===", sample_n)
     # 用 US 高资源英语数据 + 文本 gold (annotations[].en_answers)
-    raw_path_dl = Path("${EXPERIMENT_ROOT}/data/raw/blend/hf/data/annotations_hf/US_data.json")
-    raw_path_gcp = ROOT / "data" / "raw" / "blend" / "hf" / "data" / "annotations_hf" / "US_data.json"
-    raw_path = raw_path_dl if raw_path_dl.exists() else raw_path_gcp
+    raw_path = (
+        DATA_ROOT
+        / "data"
+        / "raw"
+        / "blend"
+        / "hf"
+        / "data"
+        / "annotations_hf"
+        / "US_data.json"
+    )
     if not raw_path.exists():
         return {
             "bench": "blend_saq",
@@ -552,9 +557,9 @@ def run_blend_saq(out_records: list, sample_n: int = N_BLEND_SAQ) -> dict:
 
     return {
         "bench": "blend_saq",
-        "n_sampled": int(len(chosen)),
+        "n_sampled": len(chosen),
         "n_failed": int(fails),
-        "n_evaluated": int(len(em_list)),
+        "n_evaluated": len(em_list),
         "metrics": {
             "EM": float(np.mean(em_list)) if em_list else None,
             "Token_F1": float(np.mean(f1_list)) if f1_list else None,
@@ -663,7 +668,7 @@ def build_report(results: dict, assertions: dict, log: dict) -> str:
         "",
         f"- 时间 (JST): {log['timestamp_jst']}",
         f"- 模型: {log['model']}",
-        f"- 机器: gpu_server",
+        "- 机器: gpu_server",
         f"- 子样 seed: {SEED}",
         "",
         "## 总览",

@@ -13,9 +13,26 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from src.run_predictions import (  # noqa: E402
-    BENCHMARKS,
-    METHODS,
+from src.aggregate_results import (
+    RunSummary,
+    aggregate_runs,
+    bootstrap_ci,
+    compare_table_markdown,
+    compare_to_baseline,
+    headroom_normalized,
+    load_run_summaries,
+    main_table_markdown,
+    paired_bootstrap_diff,
+)
+from src.calibrate import (
+    CalibrationResult,
+    apply_per_benchmark,
+    apply_temperature,
+    fit_per_benchmark,
+    fit_temperature,
+    negative_log_likelihood_from_probs,
+)
+from src.run_predictions import (
     RunArtifacts,
     RunConfig,
     dump_artifacts,
@@ -23,28 +40,6 @@ from src.run_predictions import (  # noqa: E402
     parse_args,
     register_method,
 )
-from src.calibrate import (  # noqa: E402
-    CalibrationResult,
-    apply_temperature,
-    fit_per_benchmark,
-    fit_temperature,
-    negative_log_likelihood_from_probs,
-    apply_per_benchmark,
-)
-from src.aggregate_results import (  # noqa: E402
-    LOWER_IS_BETTER,
-    ORACLE_FLOOR,
-    RunSummary,
-    aggregate_runs,
-    bootstrap_ci,
-    compare_to_baseline,
-    compare_table_markdown,
-    headroom_normalized,
-    load_run_summaries,
-    main_table_markdown,
-    paired_bootstrap_diff,
-)
-
 
 # ---------------------------------------------------------------------------
 # run_predictions
@@ -132,7 +127,7 @@ class TestDumpArtifacts:
         arts = RunArtifacts(config=c, n_items=10, n_succeeded=10, n_failed=0,
                             metrics={"W1_mean": 0.3},
                             sanity_records=[{"item_id": "x", "pred": 1}] * 5)
-        with tempfile.TemporaryResearchery() as td:
+        with tempfile.TemporaryDirectory() as td:
             paths = dump_artifacts(arts, td)
             assert "summary" in paths
             data = json.loads(paths["summary"].read_text())
@@ -144,7 +139,7 @@ class TestDumpArtifacts:
     def test_no_sanity_for_non_default_seed(self):
         c = RunConfig(method="no_culture", benchmark="wvb", seed=99)
         arts = RunArtifacts(config=c, sanity_records=[{"x": 1}])
-        with tempfile.TemporaryResearchery() as td:
+        with tempfile.TemporaryDirectory() as td:
             paths = dump_artifacts(arts, td)
             assert "sanity" not in paths
 
@@ -357,7 +352,7 @@ class TestCompareToBaseline:
 
 class TestLoadAndMarkdown:
     def test_load_run_summaries(self):
-        with tempfile.TemporaryResearchery() as td:
+        with tempfile.TemporaryDirectory() as td:
             p = Path(td) / "x.json"
             p.write_text(json.dumps({
                 "config": {"method": "a", "benchmark": "wvb", "config_id": "abc"},

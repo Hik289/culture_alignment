@@ -1,17 +1,7 @@
-"""统一实验入口骨架 (RUNNING 阶段实施前的接口契约).
+"""Shared configuration, dispatch, and artifact contracts for experiment runs.
 
-不实现 LLM 调用逻辑 (那是 RUNNING 阶段事). 仅:
-- 命令行参数 (method / benchmark / prompt_variant / seed / 输出路径)
-- 配置加载 (RunConfig)
-- 子样选择 (data_scientist split.json 索引)
-- 任务调度脚手架 (循环每个 item → 调 method → 拿 prediction → 拿 metric → 累计)
-- 产物路径 + Researcher 新规 (sanity 100 + 大文件 prune)
-
-EXP_DESIGN 后接入:
-- method handlers (no_culture / country / demographic / prototype / general_semantic / culturelens_rc)
-- 实际 LLM 调用 (src.model_client + src.prompts)
-- 实际 metric 计算 (src.metrics)
-- 实际 split 加载 (src.io.load_split)
+Method handlers and benchmark loading are explicit integration points; calling
+an unregistered or incomplete path fails instead of producing partial results.
 """
 
 from __future__ import annotations
@@ -21,13 +11,14 @@ import json
 import logging
 import os
 import sys
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# 支持的方法 (与 hypothesis_tree H0.method_* + readme §14 baseline 对齐)
+# Methods correspond to the baselines and main method in README §14.
 METHODS = (
     "no_culture",        # §14.1 baseline
     "country",           # §14.2 baseline
@@ -41,19 +32,18 @@ BENCHMARKS = ("wvb", "goqa", "normad", "blend_mc", "blend_saq")
 
 @dataclass
 class RunConfig:
-    """单次 run 的全部参数. 写到 results.json 的 'config' 字段保证可复现."""
+    """Complete configuration persisted with one experiment run."""
     method: str
     benchmark: str
-    prompt_variant: int = 0        # 0,1,2 → 三个 prompt 措辞变体 (Theorist §4)
-    seed: int = 42                 # numpy/random 全局种子
-    n_subsample: Optional[int] = None  # None = 全 test; 非 None 时按 seed 子样
-    use_calibration: bool = True   # T-scaling on/off (calibration ablation)
-    use_filter: bool = True        # hierarchical filter on/off (filtering ablation)
-    use_prototype: bool = True     # prototype on/off (prototype ablation)
-    top_k: int = 8                 # 检索 top-k
+    prompt_variant: int = 0
+    seed: int = 42
+    n_subsample: int | None = None
+    use_calibration: bool = True
+    use_filter: bool = True
+    use_prototype: bool = True
+    top_k: int = 8
     out_dir: str = "experiments/runs"
     model: str = os.environ.get("LLM_MODEL", "your-model-name")
-    # 三模块 on/off 速记 (写入文件名)
     @property
     def config_id(self) -> str:
         f = "F" if self.use_filter else "f"
@@ -74,10 +64,6 @@ class RunConfig:
             raise ValueError("top_k > 0")
 
 
-# ---------------------------------------------------------------------------
-# Method registry (placeholder; 真正实现等 RUNNING 阶段)
-# ---------------------------------------------------------------------------
-
 MethodHandler = Callable[[dict, RunConfig], dict]
 """(item, config) -> {pred_distribution / pred_label / pred_text + meta}."""
 
@@ -96,25 +82,21 @@ def register_method(name: str):
 def get_method(name: str) -> MethodHandler:
     if name not in _METHOD_REGISTRY:
         raise NotImplementedError(
-            f"method {name!r} not registered; will be implemented in RUNNING phase"
+            f"method {name!r} has no registered handler"
         )
     return _METHOD_REGISTRY[name]
 
 
-# ---------------------------------------------------------------------------
-# Driver (骨架; 不调 LLM)
-# ---------------------------------------------------------------------------
-
 @dataclass
 class RunArtifacts:
-    """单次 run 产物."""
+    """Artifacts collected for one run."""
     config: RunConfig
     n_items: int = 0
     n_succeeded: int = 0
     n_failed: int = 0
     metrics: dict[str, Any] = field(default_factory=dict)
-    sanity_records: list[dict] = field(default_factory=list)  # 前 100 条
-    derived_records: list[dict] = field(default_factory=list)  # 小型 derived per item
+    sanity_records: list[dict] = field(default_factory=list)
+    derived_records: list[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -129,25 +111,15 @@ class RunArtifacts:
 
 
 def load_items(config: RunConfig) -> list[dict]:
-    """加载 benchmark test split 的 items. 骨架: 仅声明 contract.
-
-    EXP_DESIGN 后接 src.io.load_bench + src.io.load_split('test') + 子样.
-    返回 list[dict], 每个 dict 至少含:
-      - item_id: str
-      - bench-specific fields (question, options, gold, country, etc.)
-    """
+    """Load test items for ``config``; each item must include ``item_id``."""
     raise NotImplementedError(
-        "load_items 等 RUNNING 阶段接入 src.io.load_bench + split filter"
+        "load_items requires a benchmark adapter using src.io loaders"
     )
 
 
 def run_one(config: RunConfig) -> RunArtifacts:
-    """单次 run: 遍历 items, 调 method, 收 metric, 写 sanity.
-
-    骨架: 仅声明流程, 实际 LLM 调用 / metric 算 / sanity prune 留给 RUNNING 阶段填充.
-    """
+    """Run one configuration through its registered benchmark adapter."""
     config.validate()
-    arts = RunArtifacts(config=config)
     # items = load_items(config)
     # arts.n_items = len(items)
     # method = get_method(config.method)
@@ -164,15 +136,11 @@ def run_one(config: RunConfig) -> RunArtifacts:
     #     arts.metrics = apply_calibration_and_aggregate(...)
     # else:
     #     arts.metrics = aggregate(arts.derived_records)
-    raise NotImplementedError("run_one 等 RUNNING 阶段实现")
+    raise NotImplementedError("run_one requires benchmark and metric adapters")
 
 
 def dump_artifacts(arts: RunArtifacts, base_dir: str | os.PathLike) -> dict[str, Path]:
-    """写产物到 disk. Researcher 新规:
-      - {config_id}.json : 配置 + metrics 汇总 (小, persist)
-      - {config_id}_sanity.jsonl : 前 100 records (持 seed=42 + prompt_id=0; 其余可省)
-      - {config_id}_derived.parquet : per-item metrics + small probs (上层 aggregate 用)
-    """
+    """Persist the summary and a bounded sanity sample for the default run."""
     base = Path(base_dir)
     base.mkdir(parents=True, exist_ok=True)
     cid = arts.config.config_id
@@ -181,7 +149,7 @@ def dump_artifacts(arts: RunArtifacts, base_dir: str | os.PathLike) -> dict[str,
     summary_path.write_text(json.dumps(arts.to_dict(), ensure_ascii=False, indent=2))
     out["summary"] = summary_path
 
-    # sanity 只在 seed=42 + prompt_variant=0 时落盘 (Strategy C 的写法; Researcher 决定后切换)
+    # Retain a bounded sanity sample only for the canonical seed and prompt.
     if arts.config.seed == 42 and arts.config.prompt_variant == 0:
         sanity_path = base / f"{cid}_sanity.jsonl"
         with sanity_path.open("w") as f:
@@ -235,12 +203,8 @@ def main(argv: list[str] | None = None) -> None:
     logger.info("wrote: %s", paths)
 
 
-# ---------------------------------------------------------------------------
-# 并发 batch dispatch (Researcher: ThreadPoolExecutor mock LLM 验证)
-# ---------------------------------------------------------------------------
-
+from collections.abc import Sequence
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Sequence
 
 
 def dispatch_items(
@@ -250,19 +214,16 @@ def dispatch_items(
     max_workers: int = 8,
     on_error: str = "record",  # "record" | "raise" | "skip"
 ) -> list[dict]:
-    """并发对每个 item 调用 handler.
+    """Dispatch items concurrently while preserving input order.
 
     Args:
-        items: 每个 dict 必须含 'item_id' (作 stable key, 用于结果重排)
-        handler: item -> result dict (含 'item_id')
-        max_workers: 并发数
-        on_error: 失败处理
-            - record: 在 results 里加 {item_id, ok: False, error: ...}
-            - raise: 抛出
-            - skip: 静默跳过
+        items: Each item must contain a stable ``item_id``.
+        handler: Maps an item to a result dictionary.
+        max_workers: Maximum number of concurrent calls.
+        on_error: ``record``, ``raise``, or ``skip``.
 
     Returns:
-        list[dict], 按输入 items 顺序排列 (即使并发完成顺序不同)
+        Results in input order.
     """
     if not items:
         return []
@@ -284,7 +245,7 @@ def dispatch_items(
                 if "item_id" not in res:
                     res = {**res, "item_id": iid}
                 by_id[iid] = res
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 if on_error == "raise":
                     raise
                 if on_error == "skip":
@@ -294,7 +255,6 @@ def dispatch_items(
                     "error": f"{type(e).__name__}: {e}",
                 }
 
-    # 按输入顺序输出
     return [by_id[it["item_id"]] for it in items if it["item_id"] in by_id]
 
 
@@ -306,11 +266,7 @@ def dispatch_items_with_rate_limit(
     max_per_second: float = 0.0,  # 0 = no limit
     on_error: str = "record",
 ) -> list[dict]:
-    """带 rate limit 的并发 dispatch.
-
-    Model API rate limit 可能是 RPM / TPM, 这里只做简单 RPS 限制.
-    max_per_second > 0 时, 每提交一个任务前 sleep 间隔.
-    """
+    """Dispatch concurrently with an optional request-per-second limit."""
     import time
 
     if max_per_second <= 0:
@@ -338,7 +294,7 @@ def dispatch_items_with_rate_limit(
                 if "item_id" not in res:
                     res = {**res, "item_id": iid}
                 by_id[iid] = res
-            except Exception as e:  # noqa: BLE001
+            except Exception as e:
                 if on_error == "raise":
                     raise
                 if on_error == "skip":
@@ -352,12 +308,19 @@ def dispatch_items_with_rate_limit(
 
 
 __all__ = [
-    "METHODS", "BENCHMARKS",
-    "RunConfig", "RunArtifacts",
-    "register_method", "get_method",
-    "load_items", "run_one", "dump_artifacts",
-    "dispatch_items", "dispatch_items_with_rate_limit",
-    "parse_args", "main",
+    "BENCHMARKS",
+    "METHODS",
+    "RunArtifacts",
+    "RunConfig",
+    "dispatch_items",
+    "dispatch_items_with_rate_limit",
+    "dump_artifacts",
+    "get_method",
+    "load_items",
+    "main",
+    "parse_args",
+    "register_method",
+    "run_one",
 ]
 
 

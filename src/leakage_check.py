@@ -29,10 +29,9 @@ model (e.g. `paraphrase-multilingual-MiniLM-L12-v2`).
 from __future__ import annotations
 
 import hashlib
-import re
 import unicodedata
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
-from typing import Iterable, Sequence
 
 import numpy as np
 
@@ -50,19 +49,16 @@ def _get_model(name: str = _DEFAULT_MODEL_NAME):
     return _EMBED_MODEL
 
 
-# ── text normalization ────────────────────────────────────────────────────
-_PUNCT_RE = re.compile(r"[\s\p{P}\p{S}]+", re.UNICODE) if False else re.compile(
-    r"[\s\.,;:!\?\"'\(\)\[\]\{\}\-—–_/\\\*\&\^\%\$\#\@\~\`\<\>\|\+\=]+"
-)
-
-
 def normalize_text(s: str) -> str:
-    """Lowercase, NFKC unicode normalize, collapse punctuation+whitespace to single space."""
+    """Normalize case and collapse Unicode punctuation, symbols, and whitespace."""
     if s is None:
         return ""
     s = unicodedata.normalize("NFKC", str(s)).lower()
-    s = _PUNCT_RE.sub(" ", s)
-    return s.strip()
+    normalized = "".join(
+        " " if char.isspace() or unicodedata.category(char)[0] in {"P", "S"} else char
+        for char in s
+    )
+    return " ".join(normalized.split())
 
 
 def text_hash(s: str) -> str:
@@ -104,7 +100,7 @@ class LeakageChecker:
     similarity_threshold : float
         Cosine similarity (cosine of normalized embeddings) at or above which
         an evidence is treated as a near-duplicate of the target question.
-        Default 0.95 per Researcher task spec.
+        Defaults to 0.95, as specified by the leakage-check protocol.
     model_name : str | None
         Sentence-transformer model name. If None, embedding check (R4) is
         skipped (useful for unit tests without HF model download).
@@ -215,7 +211,9 @@ class LeakageChecker:
 
 # ── CLI entry (matches readme §22 invocation) ────────────────────────────
 if __name__ == "__main__":
-    import argparse, json, sys
+    import argparse
+    import json
+    import sys
 
     p = argparse.ArgumentParser(description="CultureLens-RC leakage check (readme §10.4)")
     p.add_argument("--retrieval-log", required=True,
@@ -233,7 +231,8 @@ if __name__ == "__main__":
     with open(args.retrieval_log) as f:
         for line in f:
             line = line.strip()
-            if not line: continue
+            if not line:
+                continue
             o = json.loads(line)
             ev = EvidenceRecord(**o["evidence"])
             tg = TargetRecord(**o["target"])

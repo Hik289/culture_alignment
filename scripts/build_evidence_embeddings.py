@@ -29,15 +29,17 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parents[1]
+EXPERIMENT_ROOT = Path(os.environ.get("EXPERIMENT_ROOT", ROOT))
 sys.path.insert(0, str(ROOT))
 
-from src.build_retrieval_index import BuildConfig, build_index  # noqa: E402
+from src.build_retrieval_index import BuildConfig, build_index
 
 
 def check_deps(embedder_kind: str) -> dict[str, bool]:
@@ -59,8 +61,8 @@ def check_deps(embedder_kind: str) -> dict[str, bool]:
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(description="build evidence embeddings + FAISS index")
     p.add_argument("--evidence",
-                   default="${EXPERIMENT_ROOT}/data/evidence/evidence.jsonl",
-                   help="data_scientist evidence jsonl path")
+                   default=str(EXPERIMENT_ROOT / "data" / "evidence" / "evidence.jsonl"),
+                   help="evidence JSONL path")
     p.add_argument("--out-dir", default="/tmp/culturelens_rc/embeddings",
                    help="Strategy B: /tmp 重启丢失 OK")
     p.add_argument("--embedder", default="sentence_transformers",

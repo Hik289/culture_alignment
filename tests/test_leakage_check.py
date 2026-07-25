@@ -14,7 +14,6 @@ validates rule coverage and overall detector behaviour.
 from __future__ import annotations
 
 import json
-import os
 import random
 import sys
 from pathlib import Path
@@ -24,7 +23,7 @@ import pytest
 SRC = Path(__file__).resolve().parents[1] / "src"
 sys.path.insert(0, str(SRC))
 
-from leakage_check import (  # noqa: E402
+from leakage_check import (
     EvidenceRecord,
     LeakageChecker,
     TargetRecord,
@@ -251,6 +250,7 @@ def build_clean_pairs():
 # ── tests ─────────────────────────────────────────────────────────────────
 def test_normalize_text_is_robust():
     assert normalize_text("ABC, def?") == normalize_text("abc def")
+    assert normalize_text("家庭，重要吗？") == normalize_text("家庭 重要吗")
     assert text_hash("Hello, world!") == text_hash("hello world")
 
 
