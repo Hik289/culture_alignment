@@ -11,11 +11,15 @@ CultureLens-RC is an **inference-only** framework that aligns large language mod
 
 We evaluate on four heterogeneous benchmarks: WorldValuesBench, GlobalOpinionQA, NormAd-Eti, and BLEnD, covering survey distributions, social-norm judgments, and everyday cultural knowledge.
 
-## Repository Summary
+## At A Glance
 
-- **Scope.** How can retrieval calibrate cultural alignment across opinions, norms, and everyday knowledge?
-- **Method.** CultureLens-RC combines retrieval evidence with calibrated decision rules across heterogeneous cultural benchmarks.
-- **Contents.** Environment setup, benchmark evaluation scripts, directory structure, testing, and paper-result reproduction commands.
+| Artifact review question | Entry point |
+| --- | --- |
+| Research question | How can retrieval calibrate cultural alignment across opinions, norms, and everyday knowledge? |
+| Core method | CultureLens-RC combines retrieval evidence with calibrated decision rules across heterogeneous cultural benchmarks. |
+| Included artifacts | Environment setup, benchmark evaluation scripts, directory structure, testing, and paper-result reproduction commands. |
+| Fast validation | `pytest tests/` |
+| Paper-scale reproduction | Run evidence building, calibration, main evaluation, ablations, aggregation, and paper-table scripts. |
 
 ## Motivation
 
