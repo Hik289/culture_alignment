@@ -120,22 +120,6 @@ def load_items(config: RunConfig) -> list[dict]:
 def run_one(config: RunConfig) -> RunArtifacts:
     """Run one configuration through its registered benchmark adapter."""
     config.validate()
-    # items = load_items(config)
-    # arts.n_items = len(items)
-    # method = get_method(config.method)
-    # for i, item in enumerate(items):
-    #     pred = method(item, config)
-    #     if pred is None:
-    #         arts.n_failed += 1; continue
-    #     arts.n_succeeded += 1
-    #     metric = compute_metrics(pred, item, bench=config.benchmark)
-    #     arts.derived_records.append(metric)
-    #     if i < 100:
-    #         arts.sanity_records.append({**item, **pred, **metric})
-    # if config.use_calibration:
-    #     arts.metrics = apply_calibration_and_aggregate(...)
-    # else:
-    #     arts.metrics = aggregate(arts.derived_records)
     raise NotImplementedError("run_one requires benchmark and metric adapters")
 
 
