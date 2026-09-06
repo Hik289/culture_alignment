@@ -353,13 +353,6 @@ class TestNoLeftoverPlaceholders:
         assert not _has_placeholder(r["user"]), (kind, r["user"])
 
 
-# ---------------------------------------------------------------------------
-# Researcher 派单: 4 类输出 schema 验证
-#
-# 每个模板的 user 文本里嵌入了一个 JSON schema 块, LLM 必须按该 schema 返回.
-# 这里通过模拟 LLM 返回符合 schema 的合规 JSON, 验证下游 parser (model_client._try_parse_json)
-# 能正确解析这个 JSON, 且符合 prompts.py 在文本中声明的字段约束.
-# ---------------------------------------------------------------------------
 
 import json
 
