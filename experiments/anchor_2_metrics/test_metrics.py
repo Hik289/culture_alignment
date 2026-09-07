@@ -266,10 +266,6 @@ class TestShortAnswer:
     def test_token_f1_corpus(self):
         preds = ["hello world", "good"]
         golds = ["hello", "good"]
-        # 第一对: pred={hello,world}, gold={hello}, common=1
-        #   P=1/2, R=1/1 → F1 = 2*.5*1/(1.5)= 2/3
-        # 第二对: F1=1
-        # mean = (2/3+1)/2 = 5/6
         got = token_f1_corpus(preds, golds)
         assert math.isclose(got, 5 / 6, abs_tol=TOL)
 
